@@ -365,7 +365,7 @@ export const getAvailableCases = async (req: Request, res: Response): Promise<vo
 export const completeCase = async (req: Request, res: Response): Promise<void> => {
   try {
     const { caseId } = req.params;
-    const { completionNotes } = req.body;
+    const { completionNotes, income } = req.body;
 
     if (!caseId) {
       res.status(400).json({
@@ -396,7 +396,7 @@ export const completeCase = async (req: Request, res: Response): Promise<void> =
       );
     });
 
-    // Get case details for notification
+    // Get case details for notification and income tracking
     const caseDetails = await new Promise<any>((resolve, reject) => {
       db.db.get(
         'SELECT customer_id, provider_id FROM marketplace_service_cases WHERE id = ?',
@@ -408,6 +408,41 @@ export const completeCase = async (req: Request, res: Response): Promise<void> =
       );
     });
 
+    // Record income if provided
+    if (income && income.amount && caseDetails?.provider_id) {
+      const incomeId = uuidv4();
+      await new Promise<void>((resolve, reject) => {
+        db.db.run(
+          `INSERT INTO case_income (
+            id, case_id, provider_id, customer_id, amount, 
+            currency, payment_method, notes, recorded_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            incomeId,
+            caseId,
+            caseDetails.provider_id,
+            caseDetails.customer_id,
+            income.amount,
+            income.currency || 'BGN',
+            income.paymentMethod || null,
+            income.notes || null,
+            now,
+            now,
+            now
+          ],
+          function(err) {
+            if (err) {
+              logger.error('❌ Error recording income:', err);
+              reject(err);
+            } else {
+              logger.info('💰 Income recorded successfully', { incomeId, amount: income.amount });
+              resolve();
+            }
+          }
+        );
+      });
+    }
+
     // Send notification to customer and request review
     if (caseDetails?.customer_id && caseDetails?.provider_id) {
       await notificationService.notifyCaseCompleted(
@@ -417,12 +452,13 @@ export const completeCase = async (req: Request, res: Response): Promise<void> =
       );
     }
 
-    logger.info('✅ Case completed successfully', { caseId });
+    logger.info('✅ Case completed successfully', { caseId, incomeRecorded: !!income });
 
     res.json({
       success: true,
       data: {
-        message: 'Case completed successfully'
+        message: 'Case completed successfully',
+        incomeRecorded: !!income
       }
     });
 
@@ -675,6 +711,21 @@ export const getCaseStats = async (req: Request, res: Response): Promise<void> =
       );
     });
 
+    // Get available cases count (unassigned cases for service providers)
+    let availableCount = 0;
+    if (providerId) {
+      availableCount = await new Promise<number>((resolve, reject) => {
+        db.db.get(
+          `SELECT COUNT(*) as count FROM marketplace_service_cases WHERE provider_id IS NULL AND status = 'pending'`,
+          [],
+          (err, row: any) => {
+            if (err) reject(err);
+            else resolve(row?.count || 0);
+          }
+        );
+      });
+    }
+
     // Get category distribution
     const categoryStats = await new Promise<any[]>((resolve, reject) => {
       db.db.all(
@@ -690,9 +741,28 @@ export const getCaseStats = async (req: Request, res: Response): Promise<void> =
       );
     });
 
+    // Transform statusStats array into object with counts
+    const stats: any = {
+      available: availableCount,
+      pending: 0,
+      accepted: 0,
+      wip: 0,
+      completed: 0,
+      declined: 0
+    };
+
+    statusStats.forEach((stat: any) => {
+      if (stat.status === 'pending') stats.pending = stat.count;
+      else if (stat.status === 'accepted') stats.accepted = stat.count;
+      else if (stat.status === 'wip') stats.wip = stat.count;
+      else if (stat.status === 'completed') stats.completed = stat.count;
+      else if (stat.status === 'declined') stats.declined = stat.count;
+    });
+
     res.json({
       success: true,
       data: {
+        ...stats,
         statusStats,
         categoryStats
       }
@@ -847,6 +917,305 @@ export const autoAssignCase = async (req: Request, res: Response): Promise<void>
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to auto-assign case'
+      }
+    });
+  }
+};
+
+/**
+ * Get income statistics for a provider
+ */
+export const getIncomeStats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { providerId } = req.params;
+    const { startDate, endDate, period = 'month' } = req.query;
+
+    if (!providerId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Provider ID is required'
+        }
+      });
+      return;
+    }
+
+    let whereClause = 'WHERE provider_id = ?';
+    const params: any[] = [providerId];
+
+    // Add date filters if provided
+    if (startDate) {
+      whereClause += ' AND recorded_at >= ?';
+      params.push(startDate);
+    }
+    if (endDate) {
+      whereClause += ' AND recorded_at <= ?';
+      params.push(endDate);
+    }
+
+    // Get total income
+    const totalIncome = await new Promise<number>((resolve, reject) => {
+      db.db.get(
+        `SELECT COALESCE(SUM(amount), 0) as total FROM case_income ${whereClause}`,
+        params,
+        (err, row: any) => {
+          if (err) reject(err);
+          else resolve(row?.total || 0);
+        }
+      );
+    });
+
+    // Get income count
+    const incomeCount = await new Promise<number>((resolve, reject) => {
+      db.db.get(
+        `SELECT COUNT(*) as count FROM case_income ${whereClause}`,
+        params,
+        (err, row: any) => {
+          if (err) reject(err);
+          else resolve(row?.count || 0);
+        }
+      );
+    });
+
+    // Get average income per case
+    const avgIncome = incomeCount > 0 ? totalIncome / incomeCount : 0;
+
+    // Get monthly breakdown
+    const monthlyIncome = await new Promise<any[]>((resolve, reject) => {
+      db.db.all(
+        `SELECT 
+          strftime('%Y-%m', recorded_at) as month,
+          SUM(amount) as total,
+          COUNT(*) as count,
+          AVG(amount) as average
+         FROM case_income 
+         ${whereClause}
+         GROUP BY strftime('%Y-%m', recorded_at)
+         ORDER BY month DESC
+         LIMIT 12`,
+        params,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    // Get payment method breakdown
+    const paymentMethods = await new Promise<any[]>((resolve, reject) => {
+      db.db.all(
+        `SELECT 
+          COALESCE(payment_method, 'Неуточнен') as method,
+          SUM(amount) as total,
+          COUNT(*) as count
+         FROM case_income 
+         ${whereClause}
+         GROUP BY payment_method`,
+        params,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    logger.info('✅ Income stats retrieved', { providerId, totalIncome, incomeCount });
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalIncome: Math.round(totalIncome * 100) / 100,
+          incomeCount,
+          averageIncome: Math.round(avgIncome * 100) / 100,
+          currency: 'BGN'
+        },
+        monthlyIncome: monthlyIncome.map(m => ({
+          month: m.month,
+          total: Math.round(m.total * 100) / 100,
+          count: m.count,
+          average: Math.round(m.average * 100) / 100
+        })),
+        paymentMethods: paymentMethods.map(pm => ({
+          method: pm.method,
+          total: Math.round(pm.total * 100) / 100,
+          count: pm.count
+        }))
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Error fetching income stats:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch income statistics'
+      }
+    });
+  }
+};
+
+/**
+ * Get income transactions by payment method
+ */
+export const getIncomeTransactionsByMethod = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { providerId, paymentMethod } = req.params;
+
+    if (!providerId || !paymentMethod) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Provider ID and payment method are required'
+        }
+      });
+      return;
+    }
+
+    const transactions = await new Promise<any[]>((resolve, reject) => {
+      db.db.all(
+        `SELECT 
+          ci.*,
+          c.description as case_description,
+          c.service_type
+         FROM case_income ci
+         LEFT JOIN marketplace_service_cases c ON ci.case_id = c.id
+         WHERE ci.provider_id = ? AND COALESCE(ci.payment_method, 'Неуточнен') = ?
+         ORDER BY ci.recorded_at DESC`,
+        [providerId, paymentMethod],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    res.json({
+      success: true,
+      data: transactions
+    });
+
+  } catch (error) {
+    logger.error('❌ Error fetching income transactions:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch income transactions'
+      }
+    });
+  }
+};
+
+/**
+ * Get income transactions by month
+ */
+export const getIncomeTransactionsByMonth = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { providerId, month } = req.params;
+
+    if (!providerId || !month) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Provider ID and month are required'
+        }
+      });
+      return;
+    }
+
+    const transactions = await new Promise<any[]>((resolve, reject) => {
+      db.db.all(
+        `SELECT 
+          ci.*,
+          c.description as case_description,
+          c.service_type
+         FROM case_income ci
+         LEFT JOIN marketplace_service_cases c ON ci.case_id = c.id
+         WHERE ci.provider_id = ? AND strftime('%Y-%m', ci.recorded_at) = ?
+         ORDER BY ci.recorded_at DESC`,
+        [providerId, month],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    res.json({
+      success: true,
+      data: transactions
+    });
+
+  } catch (error) {
+    logger.error('❌ Error fetching income transactions by month:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch income transactions'
+      }
+    });
+  }
+};
+
+/**
+ * Update income transaction
+ */
+export const updateIncomeTransaction = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { incomeId } = req.params;
+    const { amount, paymentMethod, notes } = req.body;
+
+    if (!incomeId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Income ID is required'
+        }
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    await new Promise<void>((resolve, reject) => {
+      db.db.run(
+        `UPDATE case_income 
+         SET amount = ?, payment_method = ?, notes = ?, updated_at = ?
+         WHERE id = ?`,
+        [amount, paymentMethod, notes, now, incomeId],
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    logger.info('✅ Income transaction updated', { incomeId, amount });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Income transaction updated successfully'
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Error updating income transaction:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to update income transaction'
       }
     });
   }

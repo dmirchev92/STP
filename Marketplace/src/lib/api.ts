@@ -401,11 +401,36 @@ class ApiClient {
     })
   }
 
-  async completeCase(caseId: string, completionNotes?: string) {
-    console.log('🏁 API Client - Completing case:', caseId)
+  async completeCase(caseId: string, completionNotes?: string, income?: { amount: number; paymentMethod?: string; notes?: string }) {
+    console.log('🏁 API Client - Completing case:', caseId, 'with income:', income)
     return this.client.post(`/cases/${caseId}/complete`, {
-      completionNotes
+      completionNotes,
+      income
     })
+  }
+
+  async getIncomeStats(providerId: string, startDate?: string, endDate?: string) {
+    console.log('💰 API Client - Getting income stats for provider:', providerId)
+    const params = new URLSearchParams()
+    if (startDate) params.append('startDate', startDate)
+    if (endDate) params.append('endDate', endDate)
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    return this.client.get(`/income/provider/${providerId}${queryString}`)
+  }
+
+  async getIncomeTransactionsByMethod(providerId: string, paymentMethod: string) {
+    console.log('💰 API Client - Getting transactions for method:', paymentMethod)
+    return this.client.get(`/income/provider/${providerId}/method/${encodeURIComponent(paymentMethod)}`)
+  }
+
+  async getIncomeTransactionsByMonth(providerId: string, month: string) {
+    console.log('💰 API Client - Getting transactions for month:', month)
+    return this.client.get(`/income/provider/${providerId}/month/${month}`)
+  }
+
+  async updateIncomeTransaction(incomeId: string, data: { amount: number; paymentMethod?: string; notes?: string }) {
+    console.log('💰 API Client - Updating income transaction:', incomeId)
+    return this.client.put(`/income/${incomeId}`, data)
   }
 
 
