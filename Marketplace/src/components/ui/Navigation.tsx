@@ -28,27 +28,36 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
     { href: '/', label: 'Начало', icon: '🏠' },
     { href: '/search', label: 'Търсене', icon: '🔍' },
     { href: '/create-case', label: 'Нова заявка', icon: '➕' },
-    { href: '/dashboard', label: 'Табло', icon: '📊' },
+    // Dashboard only for service providers
+    ...(user?.role === 'tradesperson' || user?.role === 'service_provider' ? [
+      { href: '/dashboard', label: 'Табло', icon: '📊' },
+    ] : []),
   ];
 
   const userMenuItems = [
-    { href: '/dashboard', label: 'Моето табло', icon: '📊' },
+    // Dashboard and referrals only for service providers
+    ...(user?.role === 'tradesperson' || user?.role === 'service_provider' ? [
+      { href: '/dashboard', label: 'Моето табло', icon: '📊' },
+      { href: '/referrals', label: 'Препоръки', icon: '🎯' },
+    ] : []),
     { href: '/profile', label: 'Профил', icon: '👤' },
     { href: '/notifications', label: 'Известия', icon: '🔔', badge: unreadCount },
-    { href: '/referrals', label: 'Препоръки', icon: '🎯' },
+    ...(user?.role === 'tradesperson' || user?.role === 'service_provider' ? [
+      { href: '/settings/sms', label: 'SMS Настройки', icon: '📱' }
+    ] : []),
     { href: '/settings', label: 'Настройки', icon: '⚙️' },
   ];
 
   return (
-    <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <nav className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900/90 text-slate-100 backdrop-blur-md border-b border-white/10 sticky top-0 z-50 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-200">
+            <div className="w-8 h-8 bg-white/10 border border-white/20 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-200">
               <span className="text-white font-bold text-sm">🔧</span>
             </div>
-            <span className="text-xl font-bold text-slate-800">
+            <span className="text-xl font-bold text-white">
               ServiceText Pro
             </span>
           </Link>
@@ -59,7 +68,7 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-600 hover:text-slate-700 hover:bg-slate-50 transition-all duration-200 group"
+                className="flex items-center space-x-2 px-3 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/10 transition-all duration-200 group"
               >
                 <span className="group-hover:scale-110 transition-transform duration-200">
                   {item.icon}
@@ -75,7 +84,7 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
               <div className="relative">
                 <button
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-slate-50 transition-all duration-200 group"
+                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
                 >
                   <Avatar
                     name={`${user.firstName} ${user.lastName}`}
@@ -85,16 +94,23 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
                     showStatus
                   />
                   <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-white">
                       {user.firstName} {user.lastName}
                     </p>
-                    <p className="text-xs text-gray-500 capitalize">
-                      {user.role === 'service_provider' ? 'Доставчик' : 'Клиент'}
-                    </p>
+                    <div className="flex items-center space-x-2">
+                      <span className={cn(
+                        "text-xs px-2 py-0.5 rounded-full font-medium",
+                        user.role === 'tradesperson' || user.role === 'service_provider' 
+                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/30' 
+                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                      )}>
+                        {user.role === 'tradesperson' || user.role === 'service_provider' ? 'Изпълнител' : 'Клиент'}
+                      </span>
+                    </div>
                   </div>
                   <svg
                     className={cn(
-                      'w-4 h-4 text-gray-400 transition-transform duration-200',
+                      'w-4 h-4 text-slate-300 transition-transform duration-200',
                       isProfileMenuOpen && 'rotate-180'
                     )}
                     fill="none"
@@ -107,19 +123,19 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
 
                 {/* Profile Dropdown */}
                 {isProfileMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">
+                  <div className="absolute right-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/10 py-2 z-50">
+                    <div className="px-4 py-3 border-b border-white/10">
+                      <p className="text-sm font-medium text-white">
                         {user.firstName} {user.lastName}
                       </p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-xs text-slate-300">{user.email}</p>
                     </div>
                     
                     {userMenuItems.map((item) => (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className="flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 hover:text-slate-700 transition-colors duration-200"
+                        className="flex items-center justify-between px-4 py-2 text-sm text-slate-200 hover:bg-white/10 hover:text-white transition-colors duration-200"
                         onClick={() => setIsProfileMenuOpen(false)}
                       >
                         <div className="flex items-center space-x-3">
@@ -134,13 +150,13 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
                       </Link>
                     ))}
                     
-                    <div className="border-t border-gray-100 mt-2 pt-2">
+                    <div className="border-t border-white/10 mt-2 pt-2">
                       <button
                         onClick={() => {
                           setIsProfileMenuOpen(false);
                           onLogout?.();
                         }}
-                        className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
+                        className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors duration-200"
                       >
                         <span>🚪</span>
                         <span>Изход</span>
@@ -171,7 +187,7 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-gray-600 hover:text-slate-700 hover:bg-slate-50 transition-colors duration-200"
+              className="md:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors duration-200"
             >
               <svg
                 className="w-6 h-6"
@@ -191,13 +207,13 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 py-4">
+          <div className="md:hidden border-t border-white/10 py-4">
             <div className="space-y-2">
               {navigationItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-600 hover:text-slate-700 hover:bg-slate-50 transition-colors duration-200"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/10 transition-colors duration-200"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <span>{item.icon}</span>

@@ -19,6 +19,7 @@ import { ServiceTextProError } from './types';
 import authRoutes from './controllers/authController';
 import gdprRoutes from './controllers/gdprController';
 import messagingRoutes from './controllers/messagingController';
+import adminRoutes from './controllers/adminController';
 import * as marketplaceController from './controllers/marketplaceController';
 import * as chatTokenController from './controllers/chatTokenController';
 import * as referralController from './controllers/referralController';
@@ -103,23 +104,21 @@ class ServiceTextProServer {
     }));
 
     // CORS configuration with GDPR compliance
-    if (config.security.cors.enabled) {
-      this.app.use(cors({
-        origin: config.security.cors.origin,
-        credentials: config.security.cors.credentials,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: [
-          'Origin',
-          'X-Requested-With', 
-          'Content-Type', 
-          'Accept', 
-          'Authorization',
-          'X-Request-ID',
-          'X-GDPR-Consent',
-          'X-Data-Processing-Basis'
-        ]
-      }));
-    }
+    this.app.use(cors({
+      origin: config.security.cors.enabled ? config.security.cors.origin : ['http://localhost:3000', 'http://192.168.0.129:3002'],
+      credentials: config.security.cors.enabled ? config.security.cors.credentials : true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: [
+        'Origin',
+        'X-Requested-With', 
+        'Content-Type', 
+        'Accept', 
+        'Authorization',
+        'X-Request-ID',
+        'X-GDPR-Consent',
+        'X-Data-Processing-Basis'
+      ]
+    }));
 
     // Rate limiting with GDPR logging
     const limiter = rateLimit({
@@ -157,12 +156,19 @@ class ServiceTextProServer {
 
     this.app.use(limiter);
 
-    // Serve uploaded images statically
+    // Serve uploaded images statically with CORS headers
     const uploadsDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
-    this.app.use('/uploads', express.static(uploadsDir));
+    this.app.use('/uploads', (req, res, next) => {
+      // Add CORS headers for uploaded images
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET');
+      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+      next();
+    }, express.static(uploadsDir));
 
     // Request parsing
     this.app.use(express.json({ 
@@ -354,11 +360,13 @@ class ServiceTextProServer {
     this.app.use('/api/v1/auth', authRoutes);
     this.app.use('/api/v1/gdpr', gdprRoutes);
     this.app.use('/api/v1/messaging', messagingRoutes);
+    this.app.use('/api/v1/admin', adminRoutes);
     
     // Marketplace routes
     this.app.get('/api/v1/marketplace/providers/search', marketplaceController.searchProviders);
     this.app.get('/api/v1/marketplace/providers/:id', marketplaceController.getProvider);
     this.app.post('/api/v1/marketplace/providers/profile', marketplaceController.createOrUpdateProfile);
+    this.app.put('/api/v1/auth/profile', authenticateToken, marketplaceController.updateUserProfile);
     this.app.get('/api/v1/marketplace/categories', marketplaceController.getServiceCategories);
     this.app.get('/api/v1/marketplace/locations/cities', marketplaceController.getCities);
     this.app.get('/api/v1/marketplace/locations/neighborhoods', marketplaceController.getNeighborhoods);
@@ -366,13 +374,12 @@ class ServiceTextProServer {
     this.app.get('/api/v1/marketplace/inquiries', marketplaceController.getInquiries);
     this.app.post('/api/v1/marketplace/reviews', marketplaceController.addReview);
     this.app.post('/api/v1/marketplace/conversations/:conversationId/messages', marketplaceController.sendMessage);
+    this.app.put('/api/v1/marketplace/conversations/:conversationId', marketplaceController.updateConversation);
     
     // Chat routes
     this.app.post('/api/v1/chat/conversations', chatController.startConversation);
     this.app.post('/api/v1/chat/messages', chatController.sendMessage);
     this.app.get('/api/v1/chat/messages', chatController.getAllMessages);
-    this.app.get('/api/v1/chat/conversations/:conversationId/messages', chatController.getMessages);
-    this.app.get('/api/v1/chat/conversations/:conversationId', chatController.getConversation);
     this.app.get('/api/v1/chat/provider/:providerId/conversations', chatController.getProviderConversations);
     this.app.put('/api/v1/chat/conversations/:conversationId/read', chatController.markAsRead);
     
@@ -387,28 +394,32 @@ class ServiceTextProServer {
     this.app.get('/api/v1/referrals/validate/:code', referralController.validateReferralCode);
     
     // Case management routes
+    // IMPORTANT: Specific routes must come BEFORE parameterized routes
     this.app.post('/api/v1/cases', caseController.createCase);
-    this.app.get('/api/v1/cases/provider/:providerId', caseController.getProviderCases);
-    this.app.post('/api/v1/cases/:caseId/decline', caseController.declineCase);
-    this.app.get('/api/v1/cases/queue/:providerId', caseController.getAvailableCases);
-    this.app.post('/api/v1/cases/:caseId/accept', caseController.acceptCase);
-    this.app.post('/api/v1/cases/:caseId/complete', caseController.completeCase);
     this.app.get('/api/v1/cases', caseController.getCasesWithFilters);
     this.app.get('/api/v1/cases/stats', caseController.getCaseStats);
+    this.app.get('/api/v1/cases/provider/:providerId', caseController.getProviderCases);
+    this.app.get('/api/v1/cases/queue/:providerId', caseController.getAvailableCases);
+    this.app.get('/api/v1/cases/:caseId', caseController.getCase);
     this.app.get('/api/v1/cases/:caseId/smart-matches', caseController.getSmartMatches);
+    this.app.post('/api/v1/cases/:caseId/decline', caseController.declineCase);
+    this.app.post('/api/v1/cases/:caseId/accept', caseController.acceptCase);
+    this.app.post('/api/v1/cases/:caseId/complete', caseController.completeCase);
+    this.app.put('/api/v1/cases/:caseId/status', caseController.updateCaseStatus);
     this.app.post('/api/v1/cases/:caseId/auto-assign', caseController.autoAssignCase);
 
     // Notification routes
-    this.app.get('/api/v1/notifications', notificationController.getUserNotifications);
-    this.app.get('/api/v1/notifications/unread-count', notificationController.getUnreadCount);
-    this.app.post('/api/v1/notifications/:notificationId/read', notificationController.markAsRead);
-    this.app.post('/api/v1/notifications/mark-all-read', notificationController.markAllAsRead);
-    this.app.post('/api/v1/notifications/test', notificationController.createTestNotification);
+    this.app.get('/api/v1/notifications', authenticateToken, notificationController.getUserNotifications);
+    this.app.get('/api/v1/notifications/unread-count', authenticateToken, notificationController.getUnreadCount);
+    this.app.post('/api/v1/notifications/:notificationId/read', authenticateToken, notificationController.markAsRead);
+    this.app.post('/api/v1/notifications/mark-all-read', authenticateToken, notificationController.markAllAsRead);
+    this.app.post('/api/v1/notifications/test', authenticateToken, notificationController.createTestNotification);
 
     // Review routes
     this.app.post('/api/v1/reviews', authenticateToken, reviewController.createReview);
     this.app.get('/api/v1/reviews/provider/:providerId', reviewController.getProviderReviews);
     this.app.get('/api/v1/reviews/provider/:providerId/stats', reviewController.getProviderReviewStats);
+    this.app.post('/api/v1/reviews/provider/:providerId/update-rating', reviewController.updateProviderRating);
     this.app.get('/api/v1/reviews/case/:caseId/can-review', authenticateToken, reviewController.canReviewCase);
     this.app.get('/api/v1/reviews/pending', authenticateToken, reviewController.getPendingReviews);
     this.app.post('/api/v1/reviews/request', reviewController.sendReviewRequest);
@@ -521,7 +532,12 @@ class ServiceTextProServer {
   this.app.put('/api/v1/chat/conversations/:conversationId/read', chatController.markAsRead);
   
   // New chat token system routes
-  this.app.use('/api/v1/chat', require('./controllers/chatTokenController').default);
+  const chatTokenRoutes = require('./controllers/chatTokenController').default;
+  this.app.use('/api/v1/chat', chatTokenRoutes);
+  
+  // SMS configuration routes
+  const smsController = require('./controllers/smsController').default;
+  this.app.use('/api/v1/sms', smsController);
   // Simple base64 image upload (for mobile without multipart libs)
   this.app.post('/api/v1/uploads/image', async (req: Request, res: Response) => {
     try {

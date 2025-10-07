@@ -33,21 +33,21 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="py-20 bg-gradient-to-b from-white to-slate-50 relative overflow-hidden">
+    <section className="py-20 relative overflow-hidden">
       {/* Industrial Background decoration */}
       <div className="absolute inset-0">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-br from-blue-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
-        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-gradient-to-br from-orange-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-lg blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-500/10 rounded-lg blur-3xl"></div>
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="bg-gradient-to-r from-slate-700 to-blue-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
               Как работи ServiceText Pro
             </span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-slate-300 max-w-3xl mx-auto">
             Прост процес за намиране и наемане на професионалисти в България
           </p>
         </div>
@@ -76,12 +76,12 @@ export function HowItWorks() {
                     </div>
                     
                     {/* Step title */}
-                    <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-slate-600 transition-colors duration-300">
+                    <h3 className="text-xl font-bold text-white mb-4 group-hover:text-indigo-300 transition-colors duration-300">
                       {step.title}
                     </h3>
                     
                     {/* Step description */}
-                    <p className="text-gray-600 leading-relaxed">
+                    <p className="text-slate-300 leading-relaxed">
                       {step.description}
                     </p>
                   </div>

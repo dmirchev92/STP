@@ -261,6 +261,11 @@ class ApiClient {
     return this.client.put(`/cases/${caseId}/status`, { status, message })
   }
 
+  async updateCaseStatusDirect(caseId: string, status: string, message?: string) {
+    console.log('📋 API Client - Direct status update:', caseId, status)
+    return this.client.put(`/cases/${caseId}/status`, { status, message })
+  }
+
   async getProviderCases(providerId: string, status?: string) {
     console.log('📋 API Client - Getting provider cases:', providerId, status)
     const params = status ? { status } : {}
@@ -364,6 +369,7 @@ class ApiClient {
     providerId?: string
     customerId?: string
     createdByUserId?: string
+    onlyUnassigned?: string
     page?: number
     limit?: number
     sortBy?: string
@@ -409,32 +415,24 @@ class ApiClient {
     return this.client.get(`/cases/${caseId}/smart-matches${params}`)
   }
 
-  async autoAssignCase(caseId: string) {
-    console.log('🤖 API Client - Auto-assigning case:', caseId)
-    return this.client.post(`/cases/${caseId}/auto-assign`)
+  // Notification endpoints
+  async getUserNotifications() {
+    console.log('🔔 API Client - Getting user notifications')
+    return this.client.get('/notifications')
   }
 
-  // Notification Methods
-  async getNotifications(page?: number, limit?: number) {
-    console.log('🔔 API Client - Getting notifications')
-    const params = new URLSearchParams()
-    if (page) params.append('page', page.toString())
-    if (limit) params.append('limit', limit.toString())
-    return this.client.get(`/notifications?${params.toString()}`)
-  }
-
-  async getUnreadCount() {
-    console.log('🔔 API Client - Getting unread count')
+  async getUnreadNotificationCount() {
+    console.log('🔔 API Client - Getting unread notification count')
     return this.client.get('/notifications/unread-count')
   }
 
   async markNotificationAsRead(notificationId: string) {
-    console.log('✅ API Client - Marking notification as read:', notificationId)
+    console.log('🔔 API Client - Marking notification as read:', notificationId)
     return this.client.post(`/notifications/${notificationId}/read`)
   }
 
   async markAllNotificationsAsRead() {
-    console.log('✅ API Client - Marking all notifications as read')
+    console.log('🔔 API Client - Marking all notifications as read')
     return this.client.post('/notifications/mark-all-read')
   }
 

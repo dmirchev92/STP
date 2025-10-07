@@ -60,9 +60,9 @@ export default function LoginPage() {
       console.log('🔐 Attempting login with AuthContext...')
       
       // Use AuthContext login method
-      const success = await login(formData.email, formData.password)
+      const result = await login(formData.email, formData.password)
       
-      if (success) {
+      if (result.success) {
         console.log('✅ Login successful via AuthContext')
         
         // Remember credentials if requested
@@ -73,19 +73,27 @@ export default function LoginPage() {
         } else {
           localStorage.setItem('remember_flag', '0')
         }
-
+        
         // Show success message
         alert('Успешен вход!')
 
         // Wait a moment for auth state to update, then redirect
         setTimeout(() => {
-          console.log('🔄 Redirecting to main page...')
           router.push('/')
-        }, 500) // Give AuthContext time to update state
+        }, 500)
         
       } else {
         console.error('❌ Login failed via AuthContext')
-        alert('Неуспешен вход. Моля проверете данните си.')
+        
+        // Show detailed error message from backend
+        const errorMessage = result.error || 'Login failed. Please check your credentials.';
+        
+        // Log debug info for development
+        if (result.debugInfo) {
+          console.log('🔍 Login Debug Info:', result.debugInfo);
+        }
+        
+        alert(errorMessage)
       }
     } catch (error) {
       console.error('❌ Login error:', error)
@@ -98,7 +106,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Industrial background elements */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
         <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-br from-orange-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
       </div>
@@ -146,7 +154,7 @@ export default function LoginPage() {
         )}
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-20">
         <div className="card">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>

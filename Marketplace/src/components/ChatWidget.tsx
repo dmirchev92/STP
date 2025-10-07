@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api'
 
@@ -25,6 +26,8 @@ export default function ChatWidget() {
   const [sending, setSending] = useState(false)
   const [socket, setSocket] = useState<any>(null)
   const { user, isAuthenticated, isLoading } = useAuth()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const pathname = usePathname()
 
   // Debug authentication state
   console.log('💬 ChatWidget - Auth Debug:', {
@@ -35,10 +38,17 @@ export default function ChatWidget() {
     hasUserData: typeof window !== 'undefined' ? !!localStorage.getItem('user_data') : 'SSR'
   })
 
-  // Load conversations when widget opens
+  // Load conversations when widget opens and set up global WebSocket
   useEffect(() => {
     if (isOpen && isAuthenticated && user) {
       loadConversations()
+      
+      // Set up periodic refresh every 10 seconds when widget is open (more frequent to catch customer name updates)
+      const refreshInterval = setInterval(() => {
+        loadConversations()
+      }, 10000)
+      
+      return () => clearInterval(refreshInterval)
     }
   }, [isOpen, isAuthenticated, user])
 
@@ -68,16 +78,27 @@ export default function ChatWidget() {
           let conversationsData = response.data.data
           console.log('💬 ChatWidget - Raw conversations data:', JSON.stringify(conversationsData, null, 2))
           
-          // Handle different response formats
+          
+          // Handle different response formats and map fields correctly
           if (Array.isArray(conversationsData)) {
-            // Data is already an array
-            setConversations(conversationsData)
-            console.log('💬 ChatWidget - Set provider conversations (array):', conversationsData.length, conversationsData)
+            // Data is already an array - map the fields
+            const mappedConversations = conversationsData.map((conv: any) => ({
+              ...conv,
+              lastActivity: conv.last_message_at || conv.created_at, // Map last_message_at to lastActivity
+              unreadCount: conv.unread_count || 0
+            }))
+            setConversations(mappedConversations)
+            console.log('💬 ChatWidget - Set provider conversations (array):', mappedConversations.length, mappedConversations)
           } else if (conversationsData && typeof conversationsData === 'object') {
             // Data is an object, check if it has a conversations property or convert to array
             if (conversationsData.conversations && Array.isArray(conversationsData.conversations)) {
-              setConversations(conversationsData.conversations)
-              console.log('💬 ChatWidget - Set provider conversations (object.conversations):', conversationsData.conversations.length, conversationsData.conversations)
+              const mappedConversations = conversationsData.conversations.map((conv: any) => ({
+                ...conv,
+                lastActivity: conv.last_message_at || conv.created_at, // Map last_message_at to lastActivity
+                unreadCount: conv.unread_count || 0
+              }))
+              setConversations(mappedConversations)
+              console.log('💬 ChatWidget - Set provider conversations (object.conversations):', mappedConversations.length, mappedConversations)
             } else if (conversationsData.data && Array.isArray(conversationsData.data)) {
               setConversations(conversationsData.data)
               console.log('💬 ChatWidget - Set provider conversations (object.data):', conversationsData.data.length, conversationsData.data)
@@ -189,6 +210,9 @@ export default function ChatWidget() {
         setMessages([])
       }
       
+      // Auto-scroll to bottom after loading messages
+      setTimeout(() => scrollToBottom(), 200)
+      
       // Mark conversation as read after loading messages
       markConversationAsRead(conversation.id)
       
@@ -236,17 +260,22 @@ export default function ChatWidget() {
             senderType: data.senderType,
             senderName: data.senderName,
             message: data.message,
-            timestamp: data.timestamp
+            timestamp: data.timestamp,
+            sent_at: data.timestamp // Add sent_at for consistency
           }
           
           setMessages(prev => {
             const exists = prev.some(msg => msg.id === data.messageId)
             if (!exists) {
+              console.log('💬 Adding new message to chat:', newMessage)
               return [...prev, newMessage]
             }
             return prev
           })
         }
+        
+        // Also refresh conversations list to update last message
+        loadConversations()
       })
 
     } catch (error) {
@@ -278,6 +307,9 @@ export default function ChatWidget() {
         
         setMessages(prev => [...prev, newMsg])
         setNewMessage('')
+        
+        // Auto-scroll after sending message
+        setTimeout(() => scrollToBottom(), 100)
       }
     } catch (error) {
       console.error('💬 ChatWidget - Error sending message:', error)
@@ -306,6 +338,17 @@ export default function ChatWidget() {
     }
   }
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => scrollToBottom(), 100)
+    }
+  }, [messages])
+
   const goBackToConversations = () => {
     setActiveConversation(null)
     setMessages([])
@@ -316,24 +359,120 @@ export default function ChatWidget() {
     }
   }
 
-  const formatLastActivity = (timestamp: string) => {
-    const date = new Date(timestamp)
+  const formatMessageTime = (timestamp: string | number) => {
+    if (!timestamp) return 'неизвестно'
+    
+    let date: Date
+    
+    // Handle different timestamp formats
+    if (typeof timestamp === 'number') {
+      date = new Date(timestamp > 1000000000000 ? timestamp : timestamp * 1000)
+    } else if (typeof timestamp === 'string') {
+      // SQLite datetime format: "2024-01-15 10:30:45" or ISO format
+      if (timestamp.includes(' ') && !timestamp.includes('T')) {
+        // SQLite format: convert to ISO format
+        const isoTimestamp = timestamp.replace(' ', 'T') + 'Z'
+        date = new Date(isoTimestamp)
+      } else {
+        date = new Date(timestamp)
+      }
+    } else {
+      return 'неизвестно'
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid message timestamp:', timestamp)
+      return 'неизвестно'
+    }
+    
+    // Return time in HH:MM format
+    try {
+      return date.toLocaleTimeString('bg-BG', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false
+      })
+    } catch (e) {
+      return date.toLocaleTimeString()
+    }
+  }
+
+  const formatLastActivity = (timestamp: string | number) => {
+    if (!timestamp) return 'неизвестно'
+    
+    let date: Date
+    
+    // Handle different timestamp formats (same logic as formatMessageTime)
+    if (typeof timestamp === 'number') {
+      date = new Date(timestamp > 1000000000000 ? timestamp : timestamp * 1000)
+    } else if (typeof timestamp === 'string') {
+      // SQLite datetime format: "2024-01-15 10:30:45" or ISO format
+      if (timestamp.includes(' ') && !timestamp.includes('T')) {
+        // SQLite format: convert to ISO format
+        const isoTimestamp = timestamp.replace(' ', 'T') + 'Z'
+        date = new Date(isoTimestamp)
+      } else {
+        date = new Date(timestamp)
+      }
+    } else {
+      return 'неизвестно'
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid last activity timestamp:', timestamp)
+      return 'неизвестно'
+    }
+    
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'сега'
-    if (diffMins < 60) return `${diffMins}м`
-    if (diffHours < 24) return `${diffHours}ч`
-    if (diffDays < 7) return `${diffDays}д`
-    return date.toLocaleDateString('bg-BG')
+    // Show actual time for today's messages, date for older ones
+    if (diffDays === 0) {
+      // Today - show time like "14:30"
+      try {
+        return date.toLocaleTimeString('bg-BG', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false
+        })
+      } catch (e) {
+        return date.toLocaleTimeString()
+      }
+    } else if (diffDays === 1) {
+      // Yesterday - show "вчера"
+      return 'вчера'
+    } else if (diffDays < 7) {
+      // This week - show day name
+      try {
+        return date.toLocaleDateString('bg-BG', { weekday: 'short' })
+      } catch (e) {
+        return `${diffDays}д`
+      }
+    } else {
+      // Older - show date
+      try {
+        return date.toLocaleDateString('bg-BG', { 
+          day: '2-digit', 
+          month: '2-digit' 
+        })
+      } catch (e) {
+        return date.toLocaleDateString()
+      }
+    }
   }
 
   // Wait for authentication to load
   if (isLoading) {
     console.log('💬 ChatWidget - Auth still loading, waiting...')
+    return null
+  }
+
+  // Don't show widget on authentication pages
+  if (pathname?.startsWith('/auth/')) {
+    console.log('💬 ChatWidget - Not showing on auth page:', pathname)
     return null
   }
 
@@ -456,36 +595,35 @@ export default function ChatWidget() {
                       </div>
                     ) : (
                       messages.map((msg) => (
-                        <div
-                          key={msg.id}
-                          className={`flex ${
-                            (user?.role === 'service_provider' || user?.role === 'tradesperson') 
-                              ? (msg.senderType === 'provider' ? 'justify-end' : 'justify-start')
-                              : (msg.senderType === 'customer' ? 'justify-end' : 'justify-start')
-                          }`}
-                        >
                           <div
-                            className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                            key={msg.id}
+                            className={`flex ${
                               (user?.role === 'service_provider' || user?.role === 'tradesperson') 
-                                ? (msg.senderType === 'provider' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-800')
-                                : (msg.senderType === 'customer' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-800')
+                                ? (msg.senderType === 'provider' ? 'justify-end' : 'justify-start')
+                                : (msg.senderType === 'customer' ? 'justify-end' : 'justify-start')
                             }`}
                           >
-                            <div>{msg.message}</div>
-                            <div className={`text-xs mt-1 ${
-                              (user?.role === 'service_provider' || user?.role === 'tradesperson') 
-                                ? (msg.senderType === 'provider' ? 'text-purple-200' : 'text-gray-500')
-                                : (msg.senderType === 'customer' ? 'text-purple-200' : 'text-gray-500')
-                            }`}>
-                              {new Date(msg.timestamp).toLocaleTimeString('bg-BG', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
+                            <div
+                              className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                                (user?.role === 'service_provider' || user?.role === 'tradesperson') 
+                                  ? (msg.senderType === 'provider' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-800')
+                                  : (msg.senderType === 'customer' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-800')
+                              }`}
+                            >
+                              <div>{msg.message}</div>
+                              <div className={`text-xs mt-1 ${
+                                (user?.role === 'service_provider' || user?.role === 'tradesperson') 
+                                  ? (msg.senderType === 'provider' ? 'text-purple-200' : 'text-gray-500')
+                                  : (msg.senderType === 'customer' ? 'text-purple-200' : 'text-gray-500')
+                              }`}>
+                                {formatMessageTime(msg.sent_at || msg.timestamp)}
+                              </div>
                             </div>
                           </div>
-                        </div>
                       ))
                     )}
+                    {/* Invisible element to scroll to */}
+                    <div ref={messagesEndRef} />
                   </div>
                   
                   {/* Message Input */}
@@ -534,38 +672,42 @@ export default function ChatWidget() {
                       </div>
                     </div>
                   ) : (
+                    /* Conversations List */
                     <div className="flex-1 overflow-y-auto">
                       {conversations.map((conversation) => (
-                        <div
-                          key={conversation.id}
-                          onClick={() => handleConversationClick(conversation)}
-                          className="p-3 border-b hover:bg-gray-50 cursor-pointer transition-colors"
-                        >
-                          <div className="flex items-start justify-between">
+                          <div
+                            key={conversation.id}
+                            onClick={() => handleConversationClick(conversation)}
+                            className="flex items-center space-x-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100"
+                          >
+                            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                              <span className="text-purple-600 font-medium text-sm">
+                                {conversation.customerName?.charAt(0) || 'C'}
+                              </span>
+                            </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center justify-between">
                                 <p className="text-sm font-medium text-gray-900 truncate">
-                                  {user?.role === 'service_provider' || user?.role === 'tradesperson'
-                                    ? conversation.customerName
-                                    : conversation.serviceProviderName}
+                                  {conversation.customerName || 'Неизвестен клиент'}
                                 </p>
-                                {conversation.unreadCount > 0 && (
-                                  <span className="bg-purple-500 text-white text-xs px-2 py-1 rounded-full">
-                                    {conversation.unreadCount}
+                                <div className="flex items-center space-x-2">
+                                  {conversation.unreadCount > 0 && (
+                                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                                      {conversation.unreadCount}
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-500">
+                                    {formatLastActivity(conversation.lastActivity)}
                                   </span>
-                                )}
+                                </div>
                               </div>
                               {conversation.lastMessage && (
-                                <p className="text-xs text-gray-500 truncate mt-1">
+                                <p className="text-sm text-gray-500 truncate mt-1">
                                   {conversation.lastMessage}
                                 </p>
                               )}
                             </div>
-                            <span className="text-xs text-gray-400 ml-2">
-                              {formatLastActivity(conversation.lastActivity)}
-                            </span>
                           </div>
-                        </div>
                       ))}
                     </div>
                   )}
@@ -581,16 +723,16 @@ export default function ChatWidget() {
                     {(user?.role === 'service_provider' || user?.role === 'tradesperson') && (
                       <>
                         <button 
-                          onClick={() => window.open('/provider/dashboard', '_blank')}
+                          onClick={() => window.open('/dashboard', '_blank')}
                           className="w-full text-left text-sm text-purple-600 hover:text-purple-800 transition-colors"
                         >
                           📊 Табло за управление
                         </button>
                         <button 
-                          onClick={() => window.open('/provider/cases', '_blank')}
+                          onClick={() => window.open('/dashboard?view=assigned', '_blank')}
                           className="w-full text-left text-sm text-purple-600 hover:text-purple-800 transition-colors"
                         >
-                          📋 Управление на заявки
+                          📋 Моите заявки
                         </button>
                       </>
                     )}

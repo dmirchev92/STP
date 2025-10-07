@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { SQLiteDatabase } from '../models/SQLiteDatabase';
 import logger from '../utils/logger';
+import config from '../utils/config';
+import { SMSSecurityService } from '../services/SMSSecurityService';
+import { SMSActivityService } from '../services/SMSActivityService';
 
 const db = new SQLiteDatabase();
 
@@ -124,6 +127,24 @@ export const getProvider = async (req: Request, res: Response): Promise<void> =>
       );
     });
 
+    // Get provider gallery images
+    const gallery = await new Promise<string[]>((resolve, reject) => {
+      db.db.all(
+        `SELECT image_url 
+         FROM provider_gallery 
+         WHERE user_id = ? 
+         ORDER BY created_at DESC`,
+        [actualUserId],
+        (err: any, rows: any) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve((rows || []).map((row: any) => row.image_url));
+          }
+        }
+      );
+    });
+
     // Combine user and profile data
     const providerData = {
       id: user.id,
@@ -150,7 +171,8 @@ export const getProvider = async (req: Request, res: Response): Promise<void> =>
       isActive: profile?.is_active !== undefined ? Boolean(profile.is_active) : true,
       profileCreatedAt: profile?.created_at,
       profileUpdatedAt: profile?.updated_at,
-      certificates: certificates
+      certificates: certificates,
+      gallery: gallery
     };
 
     logger.info('✅ Provider info retrieved successfully', { 
@@ -339,6 +361,104 @@ export const getProviderConversations = async (req: Request, res: Response): Pro
 };
 
 /**
+ * Update user profile (for settings page)
+ */
+export const updateUserProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'User not authenticated' } });
+      return;
+    }
+
+    const { firstName, lastName, phoneNumber, profile, currentPassword, newPassword } = req.body;
+
+    logger.info('🔄 Updating user profile:', { userId, hasProfile: !!profile, hasPasswordChange: !!newPassword });
+
+    // Update user basic information
+    if (firstName || lastName || phoneNumber) {
+      await new Promise<void>((resolve, reject) => {
+        const updates: string[] = [];
+        const params: any[] = [];
+
+        if (firstName) {
+          updates.push('first_name = ?');
+          params.push(firstName);
+        }
+        if (lastName) {
+          updates.push('last_name = ?');
+          params.push(lastName);
+        }
+        if (phoneNumber) {
+          updates.push('phone_number = ?');
+          params.push(phoneNumber);
+        }
+
+        if (updates.length > 0) {
+          updates.push('updated_at = datetime("now")');
+          params.push(userId);
+
+          db.db.run(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+            params,
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        } else {
+          resolve();
+        }
+      });
+    }
+
+    // Update service provider profile if provided
+    if (profile) {
+      await db.createOrUpdateProviderProfile(userId, profile);
+    }
+
+    // Handle password change
+    if (currentPassword && newPassword) {
+      // TODO: Implement password change logic
+      // For now, we'll skip this as it requires password hashing verification
+      logger.info('⚠️ Password change requested but not implemented yet');
+    }
+
+    // Get updated user data
+    const updatedUser = await new Promise<any>((resolve, reject) => {
+      db.db.get(
+        'SELECT id, email, first_name, last_name, phone_number, role FROM users WHERE id = ?',
+        [userId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    logger.info('✅ User profile updated successfully:', { userId });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Profile updated successfully',
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.first_name,
+          lastName: updatedUser.last_name,
+          phoneNumber: updatedUser.phone_number,
+          role: updatedUser.role
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('❌ Error updating user profile:', error);
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to update profile' } });
+  }
+};
+
+/**
  * Create or update provider profile with real-time updates
  */
 export const createOrUpdateProfile = async (req: Request, res: Response): Promise<void> => {
@@ -350,6 +470,48 @@ export const createOrUpdateProfile = async (req: Request, res: Response): Promis
     }
 
     logger.info('🔄 Updating provider profile:', { userId, profile: !!profile });
+
+    // Update users table if firstName, lastName, or phoneNumber are provided
+    if (profile && (profile.firstName || profile.lastName || profile.phoneNumber)) {
+      await new Promise<void>((resolve, reject) => {
+        const updates: string[] = [];
+        const params: any[] = [];
+
+        if (profile.firstName) {
+          updates.push('first_name = ?');
+          params.push(profile.firstName);
+        }
+        if (profile.lastName) {
+          updates.push('last_name = ?');
+          params.push(profile.lastName);
+        }
+        if (profile.phoneNumber) {
+          updates.push('phone_number = ?');
+          params.push(profile.phoneNumber);
+        }
+
+        if (updates.length > 0) {
+          updates.push('updated_at = datetime("now")');
+          params.push(userId);
+
+          db.db.run(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+            params,
+            (err) => {
+              if (err) {
+                logger.error('❌ Error updating users table:', err);
+                reject(err);
+              } else {
+                logger.info('✅ Updated users table:', { userId, updates: updates.slice(0, -1) });
+                resolve();
+              }
+            }
+          );
+        } else {
+          resolve();
+        }
+      });
+    }
 
     // Update profile data
     await db.createOrUpdateProviderProfile(userId, profile || {});
@@ -632,4 +794,92 @@ export const addReview = async (req: Request, res: Response): Promise<void> => {
       message: 'Review system not yet implemented'
     }
   });
+};
+
+/**
+ * Update conversation details (customer info)
+ */
+export const updateConversation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { conversationId } = req.params;
+    const { customerName, customerPhone, customerEmail } = req.body;
+
+    if (!conversationId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Conversation ID is required'
+        }
+      });
+      return;
+    }
+
+    logger.info('💬 Updating conversation details:', { 
+      conversationId, 
+      customerName,
+      customerPhone: customerPhone ? customerPhone.substring(0, 4) + '***' : undefined,
+      customerEmail: customerEmail ? customerEmail.substring(0, 3) + '***' : undefined
+    });
+
+    // Update conversation details
+    await new Promise<void>((resolve, reject) => {
+      const updates = [];
+      const values = [];
+      
+      if (customerName) {
+        updates.push('customer_name = ?');
+        values.push(customerName);
+      }
+      if (customerPhone) {
+        updates.push('customer_phone = ?');
+        values.push(customerPhone);
+      }
+      if (customerEmail) {
+        updates.push('customer_email = ?');
+        values.push(customerEmail);
+      }
+      
+      if (updates.length === 0) {
+        resolve();
+        return;
+      }
+      
+      values.push(conversationId);
+      
+      db.db.run(
+        `UPDATE marketplace_conversations 
+         SET ${updates.join(', ')}, last_message_at = datetime('now')
+         WHERE id = ?`,
+        values,
+        function(err: any) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    logger.info('✅ Conversation details updated successfully:', { conversationId });
+
+    res.json({
+      success: true,
+      data: {
+        conversationId,
+        message: 'Conversation updated successfully'
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error updating conversation:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to update conversation'
+      }
+    });
+  }
 };

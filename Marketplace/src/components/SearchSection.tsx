@@ -200,22 +200,22 @@ export function SearchSection() {
   }
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-16 relative">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl font-bold text-white mb-4">
             Намерете майстор за вашия проект
           </h2>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-slate-300">
             Изберете услугата, която търсите и намерете най-добрите професионалисти в района
           </p>
         </div>
 
-        <form onSubmit={handleSearch} className="bg-gray-50 rounded-2xl p-8">
+        <form onSubmit={handleSearch} className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 shadow-xl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Service Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-white mb-2">
                 Тип услуга
               </label>
               <select
@@ -235,7 +235,7 @@ export function SearchSection() {
 
             {/* City */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-white mb-2">
                 Град
               </label>
               <select
@@ -260,7 +260,7 @@ export function SearchSection() {
             {/* Neighborhood (only for Sofia) */}
             {searchData.city === 'София' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-white mb-2">
                   Квартал
                 </label>
                 <select

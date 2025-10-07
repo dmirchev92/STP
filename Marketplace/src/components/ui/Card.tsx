@@ -17,25 +17,25 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
 
     const variants = {
       default: `
-        bg-white border border-gray-200 shadow-md
-        hover:shadow-lg
+        bg-white/10 backdrop-blur-md border border-white/20 shadow-lg
+        hover:shadow-xl hover:bg-white/15
       `,
       elevated: `
-        bg-white shadow-lg hover:shadow-xl
-        border border-gray-100
+        bg-white/10 backdrop-blur-md shadow-xl hover:shadow-2xl
+        border border-white/20 hover:border-white/30
       `,
       glass: `
         bg-white/10 backdrop-blur-md border border-white/20
         shadow-lg hover:shadow-xl hover:bg-white/20
       `,
       gradient: `
-        bg-gradient-to-br from-purple-50 to-pink-50 
-        border border-purple-100 shadow-md
-        hover:from-purple-100 hover:to-pink-100 hover:shadow-lg
+        bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md
+        border border-white/20 shadow-lg
+        hover:from-white/15 hover:to-white/10 hover:shadow-xl
       `,
       outline: `
-        bg-transparent border-2 border-purple-200
-        hover:border-purple-300 hover:bg-purple-50/50
+        bg-transparent border-2 border-white/30
+        hover:border-white/50 hover:bg-white/10
       `
     };
 
@@ -94,7 +94,7 @@ const CardTitle = React.forwardRef<HTMLParagraphElement, CardTitleProps>(
   ({ className, children, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('text-lg font-semibold leading-none tracking-tight text-gray-900', className)}
+      className={cn('text-lg font-semibold leading-none tracking-tight text-white', className)}
       {...props}
     >
       {children}
@@ -113,7 +113,7 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, CardDescriptionPr
   ({ className, children, ...props }, ref) => (
     <p
       ref={ref}
-      className={cn('text-sm text-gray-600', className)}
+      className={cn('text-sm text-slate-300', className)}
       {...props}
     >
       {children}

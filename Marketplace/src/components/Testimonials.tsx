@@ -27,33 +27,33 @@ const testimonials = [
 
 export function Testimonials() {
   return (
-    <section className="py-20 bg-gradient-to-b from-slate-50 to-white relative overflow-hidden">
+    <section className="py-20 relative overflow-hidden">
       {/* Industrial Background decoration */}
       <div className="absolute inset-0">
-        <div className="absolute top-20 right-20 w-72 h-72 bg-gradient-to-br from-blue-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 w-96 h-96 bg-gradient-to-br from-orange-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
+        <div className="absolute top-20 right-20 w-72 h-72 bg-indigo-500/10 rounded-lg blur-3xl"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/10 rounded-lg blur-3xl"></div>
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="bg-gradient-to-r from-slate-700 to-blue-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
               Какво казват клиентите
             </span>
           </h2>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-slate-300">
             Над 10,000 доволни клиенти в цяла България
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
-            <div key={index} className="bg-white rounded-xl p-6 shadow-sm">
+            <div key={index} className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-xl">
               <div className="flex items-center mb-4">
                 <div className="text-3xl mr-3">{testimonial.avatar}</div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
-                  <p className="text-sm text-gray-600">{testimonial.location}</p>
+                  <h4 className="font-semibold text-white">{testimonial.name}</h4>
+                  <p className="text-sm text-slate-300">{testimonial.location}</p>
                 </div>
               </div>
               
@@ -65,10 +65,10 @@ export function Testimonials() {
                     </svg>
                   ))}
                 </div>
-                <span className="ml-2 text-sm text-gray-600">{testimonial.service}</span>
+                <span className="ml-2 text-sm text-slate-300">{testimonial.service}</span>
               </div>
               
-              <p className="text-gray-700 italic">
+              <p className="text-slate-200 italic">
                 "{testimonial.text}"
               </p>
             </div>

@@ -7,7 +7,6 @@ import logger, { gdprLogger } from '../utils/logger';
 import {
   User,
   Conversation,
-  ConversationState,
   MessagePlatform
 } from '../types';
 
@@ -81,7 +80,7 @@ export class RedisDatabase {
       port: config.database.redis.port,
       password: config.database.redis.password,
       db: config.database.redis.db,
-      retryDelayOnFailover: 100,
+      // retryDelayOnFailover: 100, // Removed - not supported in this Redis version
       maxRetriesPerRequest: 3,
       lazyConnect: true,
       keepAlive: 30000,
@@ -102,7 +101,7 @@ export class RedisDatabase {
     });
 
     this.client.on('error', (error) => {
-      logger.error('Redis client error', { error: error.message });
+      logger.error('Redis client error', { error: (error as Error).message });
       this.isConnected = false;
     });
 
@@ -139,7 +138,7 @@ export class RedisDatabase {
       logger.info('Redis connected successfully');
 
     } catch (error) {
-      logger.error('Failed to connect to Redis', { error: error.message });
+      logger.error('Failed to connect to Redis', { error: (error as Error).message });
       throw error;
     }
   }
@@ -175,7 +174,7 @@ export class RedisDatabase {
       logger.debug('User cached successfully', { userId: user.id });
 
     } catch (error) {
-      logger.error('Failed to cache user', { error: error.message, userId: user.id });
+      logger.error('Failed to cache user', { error: (error as Error).message, userId: user.id });
     }
   }
 
@@ -195,7 +194,7 @@ export class RedisDatabase {
       return user;
 
     } catch (error) {
-      logger.error('Failed to get cached user', { error: error.message, userId });
+      logger.error('Failed to get cached user', { error: (error as Error).message, userId });
       return null;
     }
   }
@@ -204,7 +203,7 @@ export class RedisDatabase {
     try {
       return await this.client.get(`${this.prefixes.USER_CACHE}email:${email}`);
     } catch (error) {
-      logger.error('Failed to get cached user by email', { error: error.message, email });
+      logger.error('Failed to get cached user by email', { error: (error as Error).message, email });
       return null;
     }
   }
@@ -220,7 +219,7 @@ export class RedisDatabase {
       logger.debug('User cache invalidated', { userId });
 
     } catch (error) {
-      logger.error('Failed to invalidate user cache', { error: error.message, userId });
+      logger.error('Failed to invalidate user cache', { error: (error as Error).message, userId });
     }
   }
 
@@ -253,7 +252,7 @@ export class RedisDatabase {
       logger.debug('Session created', { sessionId: session.id, userId: session.userId });
 
     } catch (error) {
-      logger.error('Failed to create session', { error: error.message, sessionId: session.id });
+      logger.error('Failed to create session', { error: (error as Error).message, sessionId: session.id });
       throw error;
     }
   }
@@ -282,7 +281,7 @@ export class RedisDatabase {
       return sessionData;
 
     } catch (error) {
-      logger.error('Failed to get session', { error: error.message, sessionId });
+      logger.error('Failed to get session', { error: (error as Error).message, sessionId });
       return null;
     }
   }
@@ -307,7 +306,7 @@ export class RedisDatabase {
       logger.debug('Session invalidated', { sessionId });
 
     } catch (error) {
-      logger.error('Failed to invalidate session', { error: error.message, sessionId });
+      logger.error('Failed to invalidate session', { error: (error as Error).message, sessionId });
     }
   }
 
@@ -330,7 +329,7 @@ export class RedisDatabase {
       logger.debug('All user sessions invalidated', { userId, count: sessionIds.length });
 
     } catch (error) {
-      logger.error('Failed to invalidate all user sessions', { error: error.message, userId });
+      logger.error('Failed to invalidate all user sessions', { error: (error as Error).message, userId });
     }
   }
 
@@ -393,7 +392,7 @@ export class RedisDatabase {
       };
 
     } catch (error) {
-      logger.error('Rate limit check failed', { error: error.message, identifier });
+      logger.error('Rate limit check failed', { error: (error as Error).message, identifier });
       // Allow request if rate limiting fails
       return { allowed: true, remaining: maxRequests, resetTime: Date.now() + windowMs };
     }
@@ -424,7 +423,7 @@ export class RedisDatabase {
       logger.debug('Conversation state updated', { conversationId });
 
     } catch (error) {
-      logger.error('Failed to set conversation state', { error: error.message, conversationId });
+      logger.error('Failed to set conversation state', { error: (error as Error).message, conversationId });
     }
   }
 
@@ -433,7 +432,7 @@ export class RedisDatabase {
       const state = await this.client.get(`${this.prefixes.CONVERSATION_STATE}${conversationId}`);
       return state ? JSON.parse(state) : null;
     } catch (error) {
-      logger.error('Failed to get conversation state', { error: error.message, conversationId });
+      logger.error('Failed to get conversation state', { error: (error as Error).message, conversationId });
       return null;
     }
   }
@@ -457,7 +456,7 @@ export class RedisDatabase {
       logger.debug('Password reset token created', { userId, token: token.substring(0, 8) + '...' });
 
     } catch (error) {
-      logger.error('Failed to set password reset token', { error: error.message, userId });
+      logger.error('Failed to set password reset token', { error: (error as Error).message, userId });
     }
   }
 
@@ -477,7 +476,7 @@ export class RedisDatabase {
       return { userId: tokenData.userId };
 
     } catch (error) {
-      logger.error('Failed to get password reset token', { error: error.message });
+      logger.error('Failed to get password reset token', { error: (error as Error).message });
       return null;
     }
   }
@@ -487,7 +486,7 @@ export class RedisDatabase {
       await this.client.del(`${this.prefixes.PASSWORD_RESET}${token}`);
       logger.debug('Password reset token invalidated');
     } catch (error) {
-      logger.error('Failed to invalidate password reset token', { error: error.message });
+      logger.error('Failed to invalidate password reset token', { error: (error as Error).message });
     }
   }
 
@@ -506,7 +505,7 @@ export class RedisDatabase {
         })
       );
     } catch (error) {
-      logger.error('Failed to cache analytics', { error: error.message, key });
+      logger.error('Failed to cache analytics', { error: (error as Error).message, key });
     }
   }
 
@@ -526,7 +525,7 @@ export class RedisDatabase {
       return cacheData.data;
 
     } catch (error) {
-      logger.error('Failed to get cached analytics', { error: error.message, key });
+      logger.error('Failed to get cached analytics', { error: (error as Error).message, key });
       return null;
     }
   }
@@ -541,7 +540,7 @@ export class RedisDatabase {
         timestamp: Date.now()
       }));
     } catch (error) {
-      logger.error('Failed to publish real-time update', { error: error.message, channel });
+      logger.error('Failed to publish real-time update', { error: (error as Error).message, channel });
     }
   }
 
@@ -566,7 +565,7 @@ export class RedisDatabase {
       }
 
     } catch (error) {
-      logger.error('Failed to handle real-time message', { error: error.message, channel });
+      logger.error('Failed to handle real-time message', { error: (error as Error).message, channel });
     }
   }
 
@@ -630,7 +629,7 @@ export class RedisDatabase {
       return { deletedKeys };
 
     } catch (error) {
-      logger.error('Failed to cleanup Redis data', { error: error.message });
+      logger.error('Failed to cleanup Redis data', { error: (error as Error).message });
       return { deletedKeys: 0 };
     }
   }

@@ -32,43 +32,43 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary: `
-        bg-gradient-to-r from-blue-600 to-blue-700 text-white
-        hover:from-blue-700 hover:to-blue-800
+        bg-indigo-600/80 text-white
+        hover:bg-indigo-600
         shadow-lg hover:shadow-xl
         border border-transparent
       `,
       secondary: `
-        bg-blue-50 text-blue-700 border border-blue-200
-        hover:bg-blue-100 hover:border-blue-300
-        shadow-sm hover:shadow-md
+        bg-white/10 text-slate-200 border border-white/20
+        hover:bg-white/20 hover:border-white/30
+        shadow-sm hover:shadow-md backdrop-blur-sm
       `,
       outline: `
-        bg-transparent text-blue-600 border-2 border-blue-600
-        hover:bg-blue-600 hover:text-white
-        shadow-sm hover:shadow-lg
+        bg-transparent text-slate-300 border-2 border-white/30
+        hover:bg-white/10 hover:text-white hover:border-white/50
+        shadow-sm hover:shadow-lg backdrop-blur-sm
       `,
       ghost: `
-        bg-transparent text-gray-600 border border-transparent
-        hover:bg-gray-100 hover:text-gray-700
+        bg-transparent text-slate-400 border border-transparent
+        hover:bg-white/5 hover:text-slate-200
       `,
       construction: `
-        bg-gradient-to-r from-orange-500 to-orange-600 text-white
-        hover:from-orange-600 hover:to-orange-700
+        bg-indigo-600/80 text-white
+        hover:bg-indigo-600
         shadow-lg hover:shadow-xl
         border border-transparent
         font-semibold
       `,
       professional: `
-        bg-gradient-to-r from-slate-600 to-slate-700 text-white
-        hover:from-slate-700 hover:to-slate-800
+        bg-white/20 text-white backdrop-blur-sm
+        hover:bg-white/30
         shadow-lg hover:shadow-xl
-        border border-transparent
+        border border-white/30
       `,
       industrial: `
-        bg-gradient-to-r from-blue-600 via-slate-600 to-orange-500 text-white
-        hover:from-blue-700 hover:via-slate-700 hover:to-orange-600
+        bg-gradient-to-r from-indigo-600/80 via-slate-600/80 to-purple-600/80 text-white
+        hover:from-indigo-600 hover:via-slate-600 hover:to-purple-600
         shadow-lg hover:shadow-2xl
-        border border-transparent
+        border border-transparent backdrop-blur-sm
         relative overflow-hidden
         before:absolute before:inset-0 before:bg-gradient-to-r 
         before:from-white/10 before:to-transparent before:opacity-0

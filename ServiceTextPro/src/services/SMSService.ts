@@ -509,6 +509,99 @@ export class SMSService {
   }
 
   /**
+   * 🔒 SECURITY: Validate phone number for premium/suspicious patterns
+   */
+  private validatePhoneNumberSecurity(phoneNumber: string): { isAllowed: boolean; reason?: string; riskLevel: string } {
+    const cleanNumber = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    
+    // LAYER 1: Primary premium patterns (same as backend)
+    const primaryPremiumPatterns = [
+      /^1\d{3,4}$/,           // 1234, 12345 (premium services)
+      /^0900\d+$/,            // 0900 numbers (premium)
+      /^090\d+$/,             // 090 numbers (premium)
+      /^\+1900\d+$/,          // International premium
+      /^\+3591\d{3,4}$/,      // Bulgarian premium with country code
+      /^18\d{2}$/,            // 1800-1899 range
+      /^19\d{2}$/,            // 1900-1999 range
+      /^0901\d+$/,            // Extended premium range
+      /^0902\d+$/,            // Extended premium range
+      /^0903\d+$/,            // Extended premium range
+    ];
+
+    // LAYER 2: Extended premium patterns
+    const extendedPremiumPatterns = [
+      /^0904\d+$/,            // 0904 premium range
+      /^0905\d+$/,            // 0905 premium range
+      /^0906\d+$/,            // 0906 premium range
+      /^0907\d+$/,            // 0907 premium range
+      /^0908\d+$/,            // 0908 premium range
+      /^0909\d+$/,            // 0909 premium range
+      /^\+359900\d+$/,        // Bulgarian 0900 with country code
+      /^\+359901\d+$/,        // Bulgarian 0901 with country code
+      /^\+359902\d+$/,        // Bulgarian 0902 with country code
+      /^\+359903\d+$/,        // Bulgarian 0903 with country code
+      /^\+359904\d+$/,        // Bulgarian 0904 with country code
+      /^\+359905\d+$/,        // Bulgarian 0905 with country code
+      /^\+359906\d+$/,        // Bulgarian 0906 with country code
+      /^\+359907\d+$/,        // Bulgarian 0907 with country code
+      /^\+359908\d+$/,        // Bulgarian 0908 with country code
+      /^\+359909\d+$/,        // Bulgarian 0909 with country code
+      /^1[0-9]{3,5}$/,        // All 1xxxx numbers (broad protection)
+      /^\+1900\d+$/,          // US premium
+      /^\+1976\d+$/,          // Caribbean premium
+      /^\+44900\d+$/,         // UK premium
+      /^\+49900\d+$/,         // German premium
+      /^\+33899\d+$/,         // French premium
+    ];
+
+    // LAYER 3: Suspicious characteristics
+    const suspiciousPatterns = [
+      /^[0-9]{1,4}$/,         // Very short numbers (1-4 digits)
+      /^[0-9]{15,}$/,         // Very long numbers (15+ digits)
+      /^\*\d+$/,              // Star codes (*123)
+      /^#\d+$/,               // Hash codes (#123)
+      /^\*\d+\*$/,            // Star codes with ending (*123*)
+      /^#\d+#$/,              // Hash codes with ending (#123#)
+    ];
+
+    // Check Layer 1
+    if (primaryPremiumPatterns.some(pattern => pattern.test(cleanNumber))) {
+      console.warn('🚨 MOBILE SECURITY - Layer 1 Block:', cleanNumber);
+      return {
+        isAllowed: false,
+        reason: 'Premium number detected - potential financial risk (Layer 1)',
+        riskLevel: 'critical'
+      };
+    }
+
+    // Check Layer 2
+    if (extendedPremiumPatterns.some(pattern => pattern.test(cleanNumber))) {
+      console.warn('🚨 MOBILE SECURITY - Layer 2 Block:', cleanNumber);
+      return {
+        isAllowed: false,
+        reason: 'Premium number detected - extended protection (Layer 2)',
+        riskLevel: 'critical'
+      };
+    }
+
+    // Check Layer 3
+    if (suspiciousPatterns.some(pattern => pattern.test(cleanNumber))) {
+      console.warn('🚨 MOBILE SECURITY - Layer 3 Block:', cleanNumber);
+      return {
+        isAllowed: false,
+        reason: 'Suspicious number characteristics detected (Layer 3)',
+        riskLevel: 'high'
+      };
+    }
+
+    console.log('✅ MOBILE SECURITY - Number passed all 3 layers:', cleanNumber);
+    return {
+      isAllowed: true,
+      riskLevel: 'low'
+    };
+  }
+
+  /**
    * Check if SMS permissions are granted
    */
   public async checkPermissions(): Promise<SMSPermissions | null> {
@@ -553,6 +646,18 @@ export class SMSService {
     try {
       if (!this.config.isEnabled) {
         console.log('📱 SMS sending is disabled');
+        return false;
+      }
+
+      // 🔒 SECURITY CHECK: Block premium numbers
+      const securityCheck = this.validatePhoneNumberSecurity(phoneNumber);
+      if (!securityCheck.isAllowed) {
+        console.error('🚨 SMS BLOCKED - Security violation:', securityCheck.reason);
+        Alert.alert(
+          '🚨 SMS Blocked - Security Protection',
+          `Cannot send SMS to ${phoneNumber}\n\nReason: ${securityCheck.reason}\n\nThis protects you from expensive charges.`,
+          [{ text: 'OK' }]
+        );
         return false;
       }
 
@@ -642,6 +747,14 @@ export class SMSService {
   public async sendMissedCallSMS(phoneNumber: string, callId: string, userId?: string): Promise<boolean> {
     console.log(`📱 Processing missed call SMS for ${phoneNumber}, Call ID: ${callId}`);
     console.log(`📱 Current sent call IDs:`, this.config.sentCallIds);
+    
+    // 🔒 SECURITY CHECK: Block premium numbers
+    const securityCheck = this.validatePhoneNumberSecurity(phoneNumber);
+    if (!securityCheck.isAllowed) {
+      console.error('🚨 MISSED CALL SMS BLOCKED - Security violation:', securityCheck.reason);
+      console.error(`🚨 Attempted to send SMS to premium number: ${phoneNumber}`);
+      return false;
+    }
     
     // Check if SMS has already been sent for this call
     if (this.config.sentCallIds.includes(callId)) {

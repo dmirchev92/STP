@@ -18,41 +18,41 @@ const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
 
     const variants = {
       default: `
-        bg-gray-100 text-gray-800 border-gray-200
-        hover:bg-gray-200
+        bg-white/10 text-slate-200 border-white/20 backdrop-blur-sm
+        hover:bg-white/20
       `,
       primary: `
-        bg-blue-100 text-blue-800 border-blue-200
-        hover:bg-blue-200
+        bg-indigo-500/20 text-indigo-300 border-indigo-400/30 backdrop-blur-sm
+        hover:bg-indigo-500/30
       `,
       success: `
-        bg-green-100 text-green-800 border-green-200
-        hover:bg-green-200
+        bg-green-500/20 text-green-300 border-green-400/30 backdrop-blur-sm
+        hover:bg-green-500/30
       `,
       warning: `
-        bg-yellow-100 text-yellow-800 border-yellow-200
-        hover:bg-yellow-200
+        bg-yellow-500/20 text-yellow-300 border-yellow-400/30 backdrop-blur-sm
+        hover:bg-yellow-500/30
       `,
       error: `
-        bg-red-100 text-red-800 border-red-200
-        hover:bg-red-200
+        bg-red-500/20 text-red-300 border-red-400/30 backdrop-blur-sm
+        hover:bg-red-500/30
       `,
       info: `
-        bg-blue-100 text-blue-800 border-blue-200
-        hover:bg-blue-200
+        bg-blue-500/20 text-white border-blue-400/30 backdrop-blur-sm
+        hover:bg-blue-500/30
       `,
       outline: `
-        bg-transparent text-gray-600 border-gray-300
-        hover:bg-gray-50
+        bg-transparent text-slate-300 border-white/30 backdrop-blur-sm
+        hover:bg-white/5
       `,
       construction: `
-        bg-gradient-to-r from-orange-500 to-orange-600 text-white border-transparent
-        hover:from-orange-600 hover:to-orange-700
+        bg-indigo-600/80 text-white border-transparent backdrop-blur-sm
+        hover:bg-indigo-600
         shadow-sm hover:shadow-md
       `,
       professional: `
-        bg-gradient-to-r from-slate-600 to-slate-700 text-white border-transparent
-        hover:from-slate-700 hover:to-slate-800
+        bg-white/20 text-white border-white/30 backdrop-blur-sm
+        hover:bg-white/30
         shadow-sm hover:shadow-md
       `
     };
@@ -109,8 +109,8 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md', classNam
     },
     pending: {
       variant: 'info' as const,
-      icon: '⏳',
-      label: 'Очаква'
+      icon: '🆕',
+      label: 'Нова'
     },
     accepted: {
       variant: 'success' as const,
@@ -121,10 +121,19 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md', classNam
       variant: 'error' as const,
       icon: '❌',
       label: 'Отказана'
+    },
+    completed: {
+      variant: 'default' as const,
+      icon: '🏁',
+      label: 'Завършена'
     }
   };
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] || {
+    variant: 'default' as const,
+    icon: '❓',
+    label: status || 'Неизвестен'
+  };
 
   return (
     <Badge

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Provider Navigation</title>
+</head>
+<body>
+    <h1>Test Provider Navigation</h1>
+    
+    <p>Testing navigation to provider detail page:</p>
+    
+    <div style="margin: 20px 0;">
+        <h3>Test Links:</h3>
+        <ul>
+            <li><a href="http://localhost:3001/provider/c9b21cdf-542f-41f3-8f39-9be6cda9b2a6" target="_blank">Provider: Ggg (99 years experience)</a></li>
+            <li><a href="http://localhost:3001/provider/8ac388d9-09d7-41ea-b97b-8af0382185eb" target="_blank">Provider: Danail Mirchev (5 years experience)</a></li>
+        </ul>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h3>Search Page Test:</h3>
+        <a href="http://localhost:3001/search?category=electrician" target="_blank">Search Electricians</a>
+    </div>
+
+    <script>
+        console.log('Testing provider navigation...');
+        
+        // Test API endpoints
+        async function testProviderAPI() {
+            try {
+                const response = await fetch('http://localhost:3000/api/v1/marketplace/providers/c9b21cdf-542f-41f3-8f39-9be6cda9b2a6');
+                const data = await response.json();
+                console.log('Provider API Response:', data);
+                
+                if (data.success) {
+                    console.log('✅ Provider API working');
+                    console.log('Business Name:', data.data.businessName);
+                    console.log('Experience Years:', data.data.experienceYears);
+                } else {
+                    console.log('❌ Provider API failed:', data);
+                }
+            } catch (error) {
+                console.error('❌ API Error:', error);
+            }
+        }
+        
+        testProviderAPI();
+    </script>
+</body>
+</html>

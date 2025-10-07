@@ -32,6 +32,12 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [currentMessage, setCurrentMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [hasValidated, setHasValidated] = useState(false);
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState({
+    name: '',
+    phone: '',
+    email: ''
+  });
   const [providerInfo, setProviderInfo] = useState<any>({
     businessName: 'Mama Mia',
     firstName: 'Mama Mia',
@@ -146,6 +152,11 @@ export default function ChatPage({ params }: ChatPageProps) {
           userId: response.data.data.userId,
           conversationId: response.data.data.conversationId
         });
+        
+        // Each token represents a unique customer interaction
+        // Always show customer form for new tokens (new customers)
+        setShowCustomerForm(true);
+        console.log('📝 Showing customer form for token:', token);
       } else {
         console.error('Token validation failed:', response.data);
         setValidationResult({
@@ -180,7 +191,21 @@ export default function ChatPage({ params }: ChatPageProps) {
   };
 
   const sendMessage = async () => {
-    if (!currentMessage.trim() || isSending || !validationResult?.conversationId) return;
+    if (!currentMessage.trim() || isSending || !validationResult?.conversationId) {
+      console.log('❌ Cannot send message:', {
+        hasMessage: !!currentMessage.trim(),
+        isSending,
+        hasConversationId: !!validationResult?.conversationId,
+        conversationId: validationResult?.conversationId
+      });
+      return;
+    }
+
+    console.log('📤 Sending message:', {
+      conversationId: validationResult.conversationId,
+      messageLength: currentMessage.length,
+      validationResult
+    });
 
     setIsSending(true);
     try {
@@ -196,16 +221,31 @@ export default function ChatPage({ params }: ChatPageProps) {
       setCurrentMessage('');
 
       // Send to backend
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/marketplace/conversations/${validationResult.conversationId}/messages`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.129:3000/api/v1';
+      const messageUrl = `${apiUrl}/marketplace/conversations/${validationResult.conversationId}/messages`;
+      console.log('📤 Sending message to:', messageUrl);
+      
+      await axios.post(messageUrl, {
         senderType: 'customer',
-        senderName: 'Customer',
+        senderName: customerInfo.name || 'Customer',
         message: currentMessage,
         messageType: 'text'
       });
 
-      console.log('Message sent successfully');
-    } catch (error) {
-      console.error('Failed to send message:', error);
+      console.log('✅ Message sent successfully');
+    } catch (error: any) {
+      console.error('❌ Failed to send message:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      
+      // Show user-friendly error
+      alert(`Грешка при изпращане на съобщението: ${error.response?.status || 'Неизвестна грешка'}\n\nДетайли: ${error.response?.data?.error?.message || error.message}`);
+      
       // Remove message from UI on error
       setMessages(prev => prev.filter(m => m.id !== Date.now().toString()));
     } finally {
@@ -218,6 +258,57 @@ export default function ChatPage({ params }: ChatPageProps) {
       e.preventDefault();
       sendMessage();
     }
+  };
+
+  const handleCustomerFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!customerInfo.name.trim() || !customerInfo.phone.trim()) {
+      alert('Моля въведете име и телефон');
+      return;
+    }
+    
+    // Store customer info for this specific token
+    const customerKey = `customer_info_${token}`;
+    localStorage.setItem(customerKey, JSON.stringify(customerInfo));
+    
+    // Update conversation with customer details
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.129:3000/api/v1';
+      const updateUrl = `${apiUrl}/marketplace/conversations/${validationResult?.conversationId}`;
+      
+      console.log('🔄 Updating conversation with customer details:', {
+        url: updateUrl,
+        conversationId: validationResult?.conversationId,
+        customerName: customerInfo.name,
+        customerPhone: customerInfo.phone,
+        customerEmail: customerInfo.email
+      });
+      
+      const response = await axios.put(updateUrl, {
+        customerName: customerInfo.name,
+        customerPhone: customerInfo.phone,
+        customerEmail: customerInfo.email
+      });
+      
+      console.log('✅ Conversation updated successfully:', response.data);
+    } catch (error: any) {
+      console.error('❌ Failed to update conversation with customer details:', error);
+      console.error('❌ Update error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+    }
+    
+    // Hide form and start chat
+    setShowCustomerForm(false);
+    setHasStartedChat(true);
+  };
+
+  const handleCustomerInfoChange = (field: string, value: string) => {
+    setCustomerInfo(prev => ({ ...prev, [field]: value }));
   };
 
   const fetchProviderInfo = async (userId: string) => {
@@ -262,6 +353,86 @@ export default function ChatPage({ params }: ChatPageProps) {
               Моля, изчакайте докато проверим вашата връзка.
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show customer information form
+  if (showCustomerForm && validationResult?.valid) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full mx-4">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Започнете чат с {providerInfo.businessName || providerInfo.firstName}
+            </h2>
+            <p className="text-gray-600">
+              Моля въведете вашите данни за да започнем разговора
+            </p>
+          </div>
+
+          <form onSubmit={handleCustomerFormSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                Име *
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={customerInfo.name}
+                onChange={(e) => handleCustomerInfoChange('name', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Вашето име"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                Телефон *
+              </label>
+              <input
+                type="tel"
+                id="phone"
+                value={customerInfo.phone}
+                onChange={(e) => handleCustomerInfoChange('phone', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0888 123 456"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Имейл (по желание)
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={customerInfo.email}
+                onChange={(e) => handleCustomerInfoChange('email', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="your@email.com"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium"
+            >
+              Започни чат
+            </button>
+          </form>
+
+          <p className="text-xs text-gray-500 text-center mt-4">
+            Вашите данни ще бъдат използвани само за този разговор
+          </p>
         </div>
       </div>
     );

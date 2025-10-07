@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import config from '../utils/config';
 import logger, { gdprLogger } from '../utils/logger';
 import { SQLiteDatabase } from '../models/SQLiteDatabase';
+import SecurityEnhancementService from './SecurityEnhancementServiceSimple';
 import {
   User,
   UserRole,
@@ -59,6 +60,7 @@ export class AuthService {
   private readonly jwtRefreshExpiresIn: string;
   private readonly bcryptRounds: number;
   private readonly database: SQLiteDatabase;
+  private readonly securityService: SecurityEnhancementService;
 
   constructor() {
     this.jwtSecret = config.security.jwt.secret;
@@ -67,6 +69,7 @@ export class AuthService {
     this.jwtRefreshExpiresIn = config.security.jwt.refreshExpiresIn;
     this.bcryptRounds = config.security.bcrypt.rounds;
     this.database = new SQLiteDatabase();
+    this.securityService = SecurityEnhancementService.getInstance();
   }
 
   /**
@@ -205,10 +208,62 @@ export class AuthService {
    */
   async login(credentials: LoginCredentials): Promise<{ user: User; tokens: AuthTokens }> {
     try {
+      const ipAddress = credentials.ipAddress || 'unknown';
+      
+      // 🔒 SECURITY: Check brute force protection
+      const bruteForceCheck = await this.securityService.checkBruteForceProtection(
+        credentials.email, 
+        ipAddress
+      );
+      
+      if (!bruteForceCheck.allowed) {
+        logger.warn('🚨 Login blocked by brute force protection', {
+          email: this.maskEmail(credentials.email),
+          ipAddress: this.maskIP(ipAddress),
+          reason: bruteForceCheck.reason
+        });
+        throw new ServiceTextProError(
+          bruteForceCheck.reason || 'Too many failed attempts', 
+          'BRUTE_FORCE_PROTECTION', 
+          429
+        );
+      }
+
       // Find user by email
       const user = await this.findUserByEmail(credentials.email);
       if (!user) {
-        throw new ServiceTextProError('Invalid credentials', 'INVALID_CREDENTIALS', 401);
+        // 🔒 SECURITY: Record failed attempt and get updated counts
+        this.securityService.recordFailedLogin(credentials.email, ipAddress);
+        const securityCheck = await this.securityService.checkBruteForceProtection(credentials.email, ipAddress);
+        
+        // Create dynamic error message for non-existent user
+        const emailRemaining = securityCheck.emailRemaining || 0;
+        let dynamicMessage = 'Invalid credentials.';
+        
+        if (emailRemaining > 0) {
+          if (emailRemaining === 1) {
+            dynamicMessage += ` ⚠️ WARNING: This account will be locked after 1 more failed attempt.`;
+          } else {
+            dynamicMessage += ` You have ${emailRemaining} attempts remaining before this account is locked for 15 minutes.`;
+          }
+          
+          // Suggest password reset for last 3 attempts
+          if (emailRemaining <= 3) {
+            dynamicMessage += ` 💡 Tip: If you forgot your password, consider using the "Forgot Password" option to reset it instead of risking account lockout.`;
+          }
+        }
+
+        // Create error with debug info
+        const error = new ServiceTextProError(dynamicMessage, 'INVALID_CREDENTIALS', 401);
+        (error as any).debugInfo = securityCheck.debugInfo;
+        (error as any).securityInfo = {
+          emailAttempts: securityCheck.emailAttempts,
+          ipAttempts: securityCheck.ipAttempts,
+          emailRemaining: securityCheck.emailRemaining,
+          ipRemaining: securityCheck.ipRemaining
+        };
+        
+        throw error;
       }
 
       // Check user status
@@ -223,8 +278,60 @@ export class AuthService {
       // Verify password
       const isPasswordValid = await bcrypt.compare(credentials.password, user.passwordHash);
       if (!isPasswordValid) {
-        throw new ServiceTextProError('Invalid credentials', 'INVALID_CREDENTIALS', 401);
+        // 🔒 SECURITY: Record failed attempt
+        this.securityService.recordFailedLogin(credentials.email, ipAddress);
+        
+        // Get updated attempt counts for dynamic message
+        const securityCheck = await this.securityService.checkBruteForceProtection(credentials.email, ipAddress);
+        
+        logger.warn('🚨 Failed login attempt', {
+          email: this.maskEmail(credentials.email),
+          ipAddress: this.maskIP(ipAddress),
+          userId: user.id,
+          emailAttempts: securityCheck.emailAttempts,
+          ipAttempts: securityCheck.ipAttempts,
+          emailRemaining: securityCheck.emailRemaining,
+          ipRemaining: securityCheck.ipRemaining
+        });
+
+        // Create dynamic error message
+        const emailRemaining = securityCheck.emailRemaining || 0;
+        const ipRemaining = securityCheck.ipRemaining || 0;
+        
+        let dynamicMessage = 'Invalid credentials.';
+        
+        if (emailRemaining > 0) {
+          if (emailRemaining === 1) {
+            dynamicMessage += ` ⚠️ WARNING: This account will be locked after 1 more failed attempt.`;
+          } else {
+            dynamicMessage += ` You have ${emailRemaining} attempts remaining before this account is locked for 15 minutes.`;
+          }
+          
+          // Suggest password reset for last 3 attempts
+          if (emailRemaining <= 3) {
+            dynamicMessage += ` 💡 Tip: If you forgot your password, consider using the "Forgot Password" option to reset it instead of risking account lockout.`;
+          }
+        }
+        
+        if (ipRemaining <= 5 && ipRemaining > 0) {
+          dynamicMessage += ` Your location has ${ipRemaining} attempts remaining before being restricted for 1 hour.`;
+        }
+
+        // Create error with debug info for development
+        const error = new ServiceTextProError(dynamicMessage, 'INVALID_CREDENTIALS', 401);
+        (error as any).debugInfo = securityCheck.debugInfo;
+        (error as any).securityInfo = {
+          emailAttempts: securityCheck.emailAttempts,
+          ipAttempts: securityCheck.ipAttempts,
+          emailRemaining: securityCheck.emailRemaining,
+          ipRemaining: securityCheck.ipRemaining
+        };
+        
+        throw error;
       }
+
+      // 🔒 SECURITY: Clear failed attempts on successful login
+      this.securityService.clearFailedAttempts(credentials.email, ipAddress);
 
       // Check GDPR compliance
       if (!user.isGdprCompliant) {
@@ -506,15 +613,43 @@ export class AuthService {
    * Parse JWT expiration time to seconds
    */
   private parseExpirationTime(expiresIn: string): number {
-    const match = expiresIn.match(/(\d+)([smhd])/);
-    if (!match) return 900; // 15 minutes default
+    const match = expiresIn.match(/^(\d+)([smhd])$/);
+    if (!match) {
+      throw new Error(`Invalid expiration format: ${expiresIn}`);
+    }
 
-    const [, value, unit] = match;
-    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
-    return parseInt(value) * (multipliers[unit as keyof typeof multipliers] || 60);
+    const value = parseInt(match[1]);
+    const unit = match[2];
+
+    switch (unit) {
+      case 's': return value;
+      case 'm': return value * 60;
+      case 'h': return value * 60 * 60;
+      case 'd': return value * 60 * 60 * 24;
+      default: throw new Error(`Invalid time unit: ${unit}`);
+    }
   }
 
-  // Database operations using LocalDatabase
+  /**
+   * Mask email for logging (privacy protection)
+   */
+  private maskEmail(email: string): string {
+    const [local, domain] = email.split('@');
+    if (!domain) return '***@***';
+    return `${local.substring(0, 2)}***@${domain}`;
+  }
+
+  /**
+   * Mask IP address for logging (privacy protection)
+   */
+  private maskIP(ipAddress: string): string {
+    const parts = ipAddress.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.${parts[2]}.***`;
+    }
+    return ipAddress.substring(0, Math.max(0, ipAddress.length - 3)) + '***';
+  }
+
   private async findUserByEmail(email: string): Promise<User | null> {
     return await this.database.findUserByEmail(email);
   }

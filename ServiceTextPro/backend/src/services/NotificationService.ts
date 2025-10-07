@@ -315,14 +315,152 @@ export class NotificationService {
   }
 
   async notifyCaseCompleted(caseId: string, customerId: string, providerId: string): Promise<void> {
-    await this.createNotification(
-      customerId,
-      'case_completed',
-      'Заявката е завършена',
-      'Вашата заявка е отбелязана като завършена. Моля оценете услугата.',
-      { caseId, providerId }
-    );
+    try {
+      console.log('🔔 NotificationService - Case completed notification triggered:', { caseId, customerId, providerId });
+      
+      // Get case details for more specific notification
+      const caseDetails = await new Promise<any>((resolve, reject) => {
+        this.db.db.get(
+          `SELECT c.*, p.first_name, p.last_name, p.business_name
+           FROM marketplace_service_cases c
+           LEFT JOIN users p ON c.provider_id = p.id
+           WHERE c.id = ?`,
+          [caseId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      if (!caseDetails) {
+        console.log('🔔 NotificationService - Case not found, using generic notification');
+        await this.createNotification(
+          customerId,
+          'case_completed',
+          'Заявката е завършена - Оценете услугата',
+          'Вашата заявка е отбелязана като завършена. Моля споделете вашето мнение за получената услуга.',
+          { caseId, providerId, action: 'review_service' }
+        );
+        return;
+      }
+
+      // Create more specific notification with case details
+      const providerName = caseDetails.business_name || `${caseDetails.first_name} ${caseDetails.last_name}`;
+      const caseDescription = caseDetails.description || caseDetails.service_type || 'услугата';
+      
+      console.log('🔔 NotificationService - Creating notification...');
+      await this.createNotification(
+        customerId,
+        'case_completed',
+        `Завършена: ${caseDescription}`,
+        `Заявката "${caseDescription}" от ${providerName} е завършена. Моля оценете получената услуга.`,
+        { caseId, providerId, action: 'review_service' }
+      );
+      console.log('🔔 NotificationService - Notification created successfully');
+
+      // Send survey request via chat message
+      console.log('🔔 NotificationService - Sending survey to chat...');
+      await this.sendSurveyToChat(caseId, customerId, providerId);
+      console.log('🔔 NotificationService - Survey chat message sent successfully');
+      
+    } catch (error) {
+      console.error('🔔 NotificationService - Error in notifyCaseCompleted:', error);
+      throw error;
+    }
   }
+
+  private async sendSurveyToChat(caseId: string, customerId: string, providerId: string): Promise<void> {
+    try {
+      console.log('💬 sendSurveyToChat - Getting case details for:', caseId);
+      
+      // Get case and provider details
+      const caseDetails = await new Promise<any>((resolve, reject) => {
+        this.db.db.get(
+          `SELECT c.*, p.first_name, p.last_name, p.business_name
+           FROM marketplace_service_cases c
+           LEFT JOIN users p ON c.provider_id = p.id
+           WHERE c.id = ?`,
+          [caseId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      console.log('💬 sendSurveyToChat - Case details:', caseDetails);
+
+      if (!caseDetails) {
+        console.log('💬 sendSurveyToChat - No case details found, returning');
+        return;
+      }
+
+      // Find existing conversation between customer and provider
+      console.log('💬 sendSurveyToChat - Looking for conversation between:', customerId, 'and', providerId);
+      
+      const conversation = await new Promise<any>((resolve, reject) => {
+        this.db.db.get(
+          `SELECT id FROM conversations 
+           WHERE (participant1_id = ? AND participant2_id = ?) 
+           OR (participant1_id = ? AND participant2_id = ?)
+           ORDER BY created_at DESC LIMIT 1`,
+          [customerId, providerId, providerId, customerId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      console.log('💬 sendSurveyToChat - Found conversation:', conversation);
+
+      if (conversation) {
+        const surveyMessage = `🌟 Заявката "${caseDetails.description}" е завършена успешно!
+
+Моля споделете вашето мнение за получената услуга от ${caseDetails.business_name || `${caseDetails.first_name} ${caseDetails.last_name}`}.
+
+Вашата оценка помага на други клиенти да направят правилния избор.
+
+👆 Натиснете тук за да оцените услугата`;
+
+        // Insert survey message into chat
+        console.log('💬 sendSurveyToChat - Inserting survey message into conversation:', conversation.id);
+        
+        const messageId = require('uuid').v4();
+        await new Promise<void>((resolve, reject) => {
+          this.db.db.run(
+            `INSERT INTO messages (id, conversation_id, sender_id, message, message_type, data, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              messageId,
+              conversation.id,
+              'system', // System message
+              surveyMessage,
+              'survey_request',
+              JSON.stringify({ caseId }), // Include caseId in data
+              new Date().toISOString()
+            ],
+            (err) => {
+              if (err) {
+                console.error('💬 sendSurveyToChat - Error inserting message:', err);
+                reject(err);
+              } else {
+                console.log('💬 sendSurveyToChat - Survey message inserted successfully with ID:', messageId);
+                resolve();
+              }
+            }
+          );
+        });
+      } else {
+        console.log('💬 sendSurveyToChat - No conversation found between customer and provider');
+      }
+    } catch (error) {
+      console.error('💬 sendSurveyToChat - Error sending survey to chat:', error);
+      throw error;
+    }
+  }
+
 
   async notifyNewCaseAvailable(caseId: string, category: string, location: string, providerIds: string[]): Promise<void> {
     const title = 'Нова заявка в района ви';

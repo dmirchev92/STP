@@ -1,22 +1,25 @@
 // Messaging Controller
-// Handles SMS, Viber Business, and other messaging platform integrations
-
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 
 import { ViberBusinessService } from '../services/ViberBusinessService';
-import { LocalDatabase } from '../models/LocalModels';
+import { authenticateToken } from '../middleware/auth';
+import { validateSMSRequest } from '../middleware/smsSecurityMiddleware';
 import logger, { gdprLogger } from '../utils/logger';
-import {
-
-  APIResponse,
-  ServiceTextProError
-} from '../types';
+import config from '../utils/config';
+import { ServiceTextProError } from '../types';
 
 const router = Router();
-const viberService = new ViberBusinessService();
-const database = new LocalDatabase();
+
+// Initialize services (some may not be fully implemented yet)
+let viberService: any = null;
+try {
+  const { ViberBusinessService } = require('../services/ViberBusinessService');
+  viberService = new ViberBusinessService();
+} catch (error: any) {
+  logger.warn('ViberBusinessService not available:', error?.message || 'Unknown error');
+}
 
 // Rate limiting for messaging endpoints
 const messagingLimiter = rateLimit({
@@ -314,10 +317,14 @@ router.get('/viber/account', async (req: Request, res: Response, next: NextFunct
  *       401:
  *         description: Unauthorized
  */
-router.post('/sms/send', messagingLimiter, [
-  body('phoneNumber').isString().notEmpty().withMessage('Phone number is required'),
-  body('message').isString().notEmpty().withMessage('Message is required'),
-], async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+router.post('/sms/send', 
+  messagingLimiter, 
+  validateSMSRequest,  // 🔒 SECURITY MIDDLEWARE ADDED!
+  [
+    body('phoneNumber').isString().notEmpty().withMessage('Phone number is required'),
+    body('message').isString().notEmpty().withMessage('Message is required'),
+  ], 
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

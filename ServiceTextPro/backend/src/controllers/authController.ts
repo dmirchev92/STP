@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import { AuthService } from '../services/AuthService';
 import { GDPRService } from '../services/GDPRService';
 import { authenticateToken } from '../middleware/auth';
+import { loginSecurity, rateLimits, inputSanitization } from '../middleware/advancedSecuritySimple';
 import config from '../utils/config';
 import logger, { gdprLogger } from '../utils/logger';
 import {
@@ -256,7 +257,9 @@ router.post('/register',
  * Authenticate user with GDPR audit logging
  */
 router.post('/login',
-  authLimiter,
+  rateLimits.auth,           // 🔒 Enhanced rate limiting
+  inputSanitization,         // 🔒 Input sanitization
+  loginSecurity,             // 🔒 Brute force protection
   validateLogin,
   handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -293,7 +296,29 @@ router.post('/login',
       res.json(response);
 
     } catch (error) {
-      next(error);
+      // Enhanced error handling for login attempts with debug info
+      if (error instanceof ServiceTextProError && error.code === 'INVALID_CREDENTIALS') {
+        const response: APIResponse = {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            details: {
+              debugInfo: (error as any).debugInfo, // Include debug info for development
+              securityInfo: (error as any).securityInfo // Include attempt counts
+            }
+          },
+          metadata: {
+            timestamp: new Date(),
+            requestId: (req as any).requestId,
+            version: config.app.version
+          }
+        };
+        
+        return res.status(error.statusCode).json(response);
+      }
+      
+      return next(error);
     }
   }
 );

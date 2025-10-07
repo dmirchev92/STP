@@ -44,31 +44,35 @@ export const config = {
   // Security configuration
   security: {
     jwt: {
-      secret: process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production-2024',
-      refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production-2024',
-      expiresIn: process.env.JWT_EXPIRES_IN || '2h',
+      secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
+      refreshSecret: process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-in-production',
+      expiresIn: process.env.JWT_EXPIRES_IN || '24h',
       refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d'
     },
     bcrypt: {
-      rounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10)
+      rounds: parseInt(process.env.BCRYPT_ROUNDS || '12')
     },
     rateLimit: {
-      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 minute (shorter window)
-      maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000', 10) // Much higher limit for development
+      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
+      maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100')
     },
     cors: {
-      enabled: true, // Enable CORS for development
-      origin: process.env.CORS_ORIGIN?.split(',') || [
-        'http://localhost:3000', 
-        'http://localhost:3002',
-        'http://192.168.0.129:3000',
-        'http://192.168.0.129:3002'
-      ],
-      credentials: true
+      enabled: process.env.CORS_ENABLED !== 'false', // Enable by default, disable only if explicitly set to false
+      origin: (process.env.CORS_ORIGIN || 'http://localhost:3000,http://192.168.0.129:3002').split(','),
+      credentials: process.env.CORS_CREDENTIALS !== 'false' // Enable credentials by default
     },
     https: {
-      force: process.env.FORCE_HTTPS === 'true',
-      hstsMaxAge: parseInt(process.env.HSTS_MAX_AGE || '31536000', 10)
+      enabled: process.env.HTTPS_ENABLED === 'true',
+      keyPath: process.env.HTTPS_KEY_PATH || '',
+      certPath: process.env.HTTPS_CERT_PATH || '',
+      hstsMaxAge: parseInt(process.env.HTTPS_HSTS_MAX_AGE || '31536000') // 1 year default
+    },
+    sms: {
+      dailyLimit: parseInt(process.env.SMS_DAILY_LIMIT || '50'),
+      rateLimitWindow: parseInt(process.env.SMS_RATE_LIMIT_WINDOW || '900000'), // 15 minutes
+      rateLimitMax: parseInt(process.env.SMS_RATE_LIMIT_MAX || '10'),
+      enableMonitoring: process.env.SMS_ENABLE_MONITORING !== 'false',
+      suspiciousThreshold: parseInt(process.env.SMS_SUSPICIOUS_THRESHOLD || '20')
     }
   },
 

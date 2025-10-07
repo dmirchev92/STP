@@ -13,6 +13,10 @@ export function Header() {
     router.push('/')
   }
 
+  // Debug logging
+  console.log('🎨 Header - User data:', user)
+  console.log('🎨 Header - Profile image URL:', (user as any)?.profileImageUrl)
+
   return (
     <Navigation 
       user={user ? {
@@ -20,7 +24,8 @@ export function Header() {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role: user.role
+        role: user.role,
+        avatar: (user as any).profileImageUrl || undefined
       } : undefined}
       unreadCount={0} // TODO: Connect to notification system
       onLogout={handleLogout}

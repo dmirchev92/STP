@@ -383,8 +383,8 @@ export const completeCase = async (req: Request, res: Response): Promise<void> =
     await new Promise<void>((resolve, reject) => {
       db.db.run(
         `UPDATE marketplace_service_cases 
-         SET status = 'closed', completion_notes = ?, completed_at = ?, updated_at = ?
-         WHERE id = ? AND status = 'wip'`,
+         SET status = 'completed', completion_notes = ?, completed_at = ?, updated_at = ?
+         WHERE id = ? AND status IN ('wip', 'accepted')`,
         [completionNotes, now, now, caseId],
         function(err) {
           if (err) {
@@ -439,6 +439,66 @@ export const completeCase = async (req: Request, res: Response): Promise<void> =
 };
 
 /**
+ * Get a single case by ID
+ */
+export const getCase = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { caseId } = req.params;
+
+    if (!caseId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_CASE_ID',
+          message: 'Case ID is required'
+        }
+      });
+      return;
+    }
+
+    const caseData = await new Promise<any>((resolve, reject) => {
+      db.db.get(
+        'SELECT * FROM marketplace_service_cases WHERE id = ?',
+        [caseId],
+        (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row);
+          }
+        }
+      );
+    });
+
+    if (!caseData) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'CASE_NOT_FOUND',
+          message: 'Case not found'
+        }
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: caseData
+    });
+
+  } catch (error) {
+    logger.error('❌ Error getting case:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to get case'
+      }
+    });
+  }
+};
+
+/**
  * Get cases with filtering and pagination
  */
 export const getCasesWithFilters = async (req: Request, res: Response): Promise<void> => {
@@ -463,12 +523,12 @@ export const getCasesWithFilters = async (req: Request, res: Response): Promise<
     const params: any[] = [];
 
     if (status) {
-      conditions.push('status = ?');
+      conditions.push('c.status = ?');
       params.push(status);
     }
 
     if (category) {
-      conditions.push('category = ?');
+      conditions.push('c.category = ?');
       params.push(category);
     }
 
@@ -476,22 +536,22 @@ export const getCasesWithFilters = async (req: Request, res: Response): Promise<
     if (createdByUserId) {
       if (onlyUnassigned === 'true') {
         // Show only unassigned cases created by this user
-        conditions.push('customer_id = ? AND provider_id IS NULL');
+        conditions.push('c.customer_id = ? AND c.provider_id IS NULL');
         params.push(createdByUserId);
       } else {
         // Show cases where user is either customer, provider, or created the case
-        conditions.push('(customer_id = ? OR provider_id = ?)');
+        conditions.push('(c.customer_id = ? OR c.provider_id = ?)');
         params.push(createdByUserId, createdByUserId);
       }
     } else {
       // Only apply individual filters if createdByUserId is not provided
       if (providerId) {
-        conditions.push('provider_id = ?');
+        conditions.push('c.provider_id = ?');
         params.push(providerId);
       }
 
       if (customerId) {
-        conditions.push('customer_id = ?');
+        conditions.push('c.customer_id = ?');
         params.push(customerId);
       }
     }
@@ -505,7 +565,7 @@ export const getCasesWithFilters = async (req: Request, res: Response): Promise<
     // Get total count
     const totalCount = await new Promise<number>((resolve, reject) => {
       db.db.get(
-        `SELECT COUNT(*) as count FROM marketplace_service_cases ${whereClause}`,
+        `SELECT COUNT(*) as count FROM marketplace_service_cases c ${whereClause}`,
         params,
         (err, row: any) => {
           if (err) {
@@ -519,10 +579,32 @@ export const getCasesWithFilters = async (req: Request, res: Response): Promise<
 
     // Get cases with pagination
     const cases = await new Promise<any[]>((resolve, reject) => {
+      // If no specific status filter is applied, sort by status priority
+      let orderClause;
+      if (!status) {
+        // Custom status priority: pending -> accepted -> wip -> declined -> completed
+        orderClause = `ORDER BY 
+          CASE c.status 
+            WHEN 'pending' THEN 1 
+            WHEN 'accepted' THEN 2 
+            WHEN 'wip' THEN 3 
+            WHEN 'declined' THEN 4 
+            WHEN 'completed' THEN 5 
+            ELSE 6 
+          END ASC, 
+          c.created_at DESC`;
+      } else {
+        orderClause = `ORDER BY c.${sortBy} ${sortOrder}`;
+      }
+
       db.db.all(
-        `SELECT * FROM marketplace_service_cases 
+        `SELECT 
+           c.*,
+           u.first_name || ' ' || u.last_name as customer_name
+         FROM marketplace_service_cases c
+         LEFT JOIN users u ON c.customer_id = u.id
          ${whereClause}
-         ORDER BY ${sortBy} ${sortOrder}
+         ${orderClause}
          LIMIT ? OFFSET ?`,
         [...params, Number(limit), offset],
         (err, rows) => {
@@ -765,6 +847,124 @@ export const autoAssignCase = async (req: Request, res: Response): Promise<void>
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to auto-assign case'
+      }
+    });
+  }
+};
+
+/**
+ * Update case status
+ */
+export const updateCaseStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { caseId } = req.params;
+    const { status, message } = req.body;
+
+    if (!caseId || !status) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Case ID and status are required'
+        }
+      });
+      return;
+    }
+
+    // Validate status values
+    const validStatuses = ['pending', 'accepted', 'declined', 'completed', 'wip', 'closed'];
+    if (!validStatuses.includes(status)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+        }
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    await new Promise<void>((resolve, reject) => {
+      db.db.run(
+        `UPDATE marketplace_service_cases 
+         SET status = ?, updated_at = ?, completion_notes = ?
+         WHERE id = ?`,
+        [status, now, message || null, caseId],
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    // If status is completed, also set completed_at
+    if (status === 'completed') {
+      await new Promise<void>((resolve, reject) => {
+        db.db.run(
+          `UPDATE marketplace_service_cases 
+           SET completed_at = ?
+           WHERE id = ?`,
+          [now, caseId],
+          function(err) {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          }
+        );
+      });
+
+      // Get case details for notification
+      const caseDetails = await new Promise<any>((resolve, reject) => {
+        db.db.get(
+          'SELECT customer_id, provider_id FROM marketplace_service_cases WHERE id = ?',
+          [caseId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      // Send notification to customer and request review
+      console.log('🏁 Case completion - Case details for notification:', caseDetails);
+      if (caseDetails?.customer_id && caseDetails?.provider_id) {
+        console.log('🏁 Case completion - Calling notifyCaseCompleted...');
+        await notificationService.notifyCaseCompleted(
+          caseId,
+          caseDetails.customer_id,
+          caseDetails.provider_id
+        );
+        console.log('🏁 Case completion - Notification service called successfully');
+      } else {
+        console.log('🏁 Case completion - Missing customer_id or provider_id, skipping notification');
+      }
+    }
+
+    logger.info('✅ Case status updated successfully', { caseId, status });
+
+    res.json({
+      success: true,
+      data: {
+        message: `Case status updated to ${status}`,
+        caseId,
+        status
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Error updating case status:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to update case status'
       }
     });
   }

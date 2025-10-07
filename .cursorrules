@@ -1,0 +1,648 @@
+ServiceText Pro - Bulgarian Market Development Plan
+This app is a tool for Bulgarian tradespeople to manage their business. When they are not available to answer the phone, they can set up a message to be sent to the caller.
+Core Features
+1. Smart Auto-Response System
+
+Instant messaging via WhatsApp and Viber when calls are missed
+Context-aware responses based on time of day, caller type, and professional status
+Customizable message templates for different scenarios (emergency, routine, after-hours)
+Professional tone options that maintain business credibility
+Bulgarian language support with proper terminology and cultural context
+
+2. Interactive AI Conversation Engine ⭐ NEW FEATURE
+
+Two-way conversation capability after initial auto-response
+Natural Language Processing for Bulgarian language
+Problem description analysis from customer responses
+Automatic issue classification (emergency, routine, complex)
+Smart follow-up questions to gather more details
+Real-time issue parsing and categorization for technician preparation
+
+3. Caller Intelligence & Classification
+
+Contact categorization (existing customers, new prospects, suppliers, emergency)
+Priority caller identification with custom response times
+Repeat caller detection with escalating response urgency
+Blacklist/whitelist management for spam protection
+Customer history integration for personalized responses
+
+4. Business Hours & Availability Management
+
+Flexible scheduling with different responses for work hours vs. after-hours
+Job site mode - automatic responses indicating current unavailability
+Emergency override for urgent situations with special contact methods
+Holiday/vacation mode with alternative contact information
+
+Advanced Features
+5. Service-Specific Templates (Bulgarian Trades)
+
+Electrical services templates (електрически услуги)
+Plumbing responses (ВиК услуги)
+HVAC/Heating templates (отопление и климатизация)
+Emergency vs routine classification with appropriate Bulgarian terminology
+Price list integration in Bulgarian leva with local market rates
+
+6. Customer Relationship Features
+
+Follow-up automation for completed jobs
+Customer feedback requests after service completion
+Referral encouragement messages for satisfied customers
+Seasonal reminders (heating checks, electrical safety)
+
+7. Integration Capabilities
+
+CRM integration to log missed calls and responses
+Bulgarian business tools compatibility
+Invoice/billing system connections
+Local review platforms integration
+
+Professional Enhancement Features
+8. Multi-Platform Communication
+
+WhatsApp Business API integration (primary platform)
+Viber Business messaging (popular in Bulgaria)
+Telegram support as alternative
+Platform preference detection based on customer's initial contact method
+
+9. Response Analytics & Optimization
+
+Response rate tracking by message type and platform
+Conversion metrics (missed call to booked job)
+Peak call time analysis for better availability planning
+A/B testing for message effectiveness in Bulgarian market
+
+10. Emergency & Urgent Call Handling
+
+Bulgarian keyword detection in voicemails for emergencies
+Escalation protocols for urgent situations
+Multiple contact methods provided in emergency responses
+Partner referral system when unavailable for emergencies
+
+User Experience Features
+11. Easy Setup & Management
+
+Quick setup wizard with Bulgarian trade-specific templates
+Bulk contact import from existing phone contacts
+One-tap response modification during busy periods
+Bulgarian language interface throughout the app
+
+12. Professional Presentation
+
+Bulgarian business information integration (ЕИК, ДДС номер)
+Service area mapping for Sofia and other Bulgarian cities
+Professional signature with Bulgarian certifications and licenses
+Local currency pricing display in Bulgarian leva
+
+13. AI-Powered Issue Analysis Dashboard
+
+Real-time problem analysis from customer descriptions
+Automatic tool/parts recommendations based on described issues
+Priority level assignment with safety considerations
+Pre-visit preparation checklist generation
+Estimated cost calculation based on issue complexity
+
+Detailed Development Steps for Cursor AI
+Phase 1: Core Infrastructure (Weeks 1-3)
+Step 1.1: Project Setup and Architecture
+- Initialize React Native project with TypeScript
+- Set up folder structure:
+  /src
+    /components (reusable UI components)
+    /screens (main app screens)
+    /services (API calls, messaging services)
+    /utils (helper functions, constants)
+    /store (state management - Redux Toolkit)
+    /localization (Bulgarian/English language files)
+    /assets (images, fonts, icons)
+- Configure development environment
+- Set up version control with Git
+- Install required dependencies:
+  - @reduxjs/toolkit (state management)
+  - react-navigation/native (navigation)
+  - react-native-contacts (contact access)
+  - react-native-call-log (call history access)
+  - react-native-permissions (system permissions)
+Step 1.2: Call Detection System
+- Implement CallListener service:
+  - Monitor incoming calls using react-native-call-log
+  - Detect missed calls in real-time
+  - Store call data (number, time, duration, contact name)
+  - Trigger auto-response workflow on missed call detection
+- Create CallLogManager:
+  - Parse call logs to identify missed calls
+  - Filter out spam/blocked numbers
+  - Associate calls with existing contacts
+  - Generate call events for the response system
+Step 1.3: Contact Management System
+- Build ContactService:
+  - Import contacts from device phonebook
+  - Categorize contacts (customer, supplier, personal)
+  - Store additional metadata (service history, preferences)
+  - Manage contact groups and priority levels
+- Implement contact classification logic:
+  - New vs existing customer detection
+  - VIP/priority customer identification
+  - Business vs personal contact separation
+Phase 2: Messaging Infrastructure (Weeks 4-6)
+Step 2.1: Multi-Platform Messaging Setup
+- WhatsApp Business API integration:
+  - Set up Meta Business account and WhatsApp Business API
+  - Implement message sending functionality
+  - Handle delivery status and read receipts
+  - Manage WhatsApp contact verification
+- Viber Business API integration:
+  - Configure Viber Business account
+  - Implement Viber message sending
+  - Handle Viber-specific message formatting
+  - Manage Viber contact verification
+- Telegram Bot API integration:
+  - Create Telegram bot for business communication
+  - Implement message sending via bot API
+  - Handle Telegram user identification
+Step 2.2: Message Template System
+- Create TemplateManager:
+  - Define template structure (title, content, triggers, conditions)
+  - Implement template variables (name, service_type, time, etc.)
+  - Support Bulgarian language templates with proper formatting
+  - Template categorization (emergency, business_hours, after_hours, new_customer)
+- Build template editor interface:
+  - Rich text editing capabilities
+  - Variable insertion (dropdown with available variables)
+  - Template preview functionality
+  - Bulgarian keyboard support
+Step 2.3: Auto-Response Engine
+- Develop ResponseEngine:
+  - Match missed call to appropriate template
+  - Replace template variables with actual data
+  - Determine best messaging platform for contact
+  - Queue message for sending with retry logic
+- Implement response logic:
+  - Business hours detection
+  - Emergency keyword detection in recent voicemails
+  - Customer type-based template selection
+  - Platform availability checking (WhatsApp > Viber > Telegram)
+Phase 3: AI Conversation System (Weeks 7-10) ⭐ KEY FEATURE
+Step 3.1: Natural Language Processing Setup
+- Integrate NLP service for Bulgarian language:
+  - Use Google Cloud Natural Language API or Azure Cognitive Services
+  - Configure Bulgarian language support
+  - Set up entity extraction (keywords, urgency levels, problem types)
+  - Implement sentiment analysis for customer messages
+- Create Bulgarian keyword dictionary:
+  - Emergency keywords: "спешно", "авария", "парене", "искри", "току що"
+  - Problem types: "табло", "контакт", "прекъсвач", "окабеляване"
+  - Urgency indicators: "веднага", "незабавно", "опасно", "не работи"
+Step 3.2: Conversation Flow Manager
+- Build ConversationManager:
+  - Track conversation state per contact
+  - Handle incoming message processing
+  - Generate appropriate follow-up questions
+  - Maintain conversation context and history
+- Implement conversation states:
+  - INITIAL_RESPONSE (auto-message sent)
+  - AWAITING_DESCRIPTION (waiting for problem details)
+  - ANALYZING (AI processing customer response)
+  - FOLLOW_UP_QUESTIONS (asking for clarification)
+  - COMPLETED (all info gathered, ready for callback)
+Step 3.3: AI Analysis Engine
+- Create IssueAnalyzer:
+  - Parse customer problem descriptions in Bulgarian
+  - Extract key information (location, symptoms, urgency)
+  - Classify problem type (electrical, plumbing, HVAC)
+  - Assign priority level (LOW, MEDIUM, HIGH, EMERGENCY)
+- Implement analysis pipeline:
+  - Text preprocessing (normalize Bulgarian text, handle dialects)
+  - Keyword extraction and matching
+  - Problem classification using rules-based logic
+  - Urgency scoring based on multiple factors
+  - Generate structured issue report
+Step 3.4: Smart Response Generation
+- Build ResponseGenerator:
+  - Generate contextual follow-up questions in Bulgarian
+  - Create problem-specific advice and safety warnings
+  - Adjust callback time based on urgency
+  - Format responses with professional Bulgarian terminology
+- Response personalization:
+  - Use customer name and history
+  - Include relevant pricing information
+  - Add appropriate safety warnings for emergencies
+  - Suggest preparation steps for the customer
+Phase 4: Dashboard and Analytics (Weeks 11-13)
+Step 4.1: Real-Time Dashboard
+- Create Dashboard components:
+  - Live conversation monitoring
+  - Real-time issue analysis display
+  - Customer information panel
+  - Recommended actions and next steps
+- Implement dashboard features:
+  - Call activity timeline
+  - Response success metrics
+  - Priority queue management
+  - Active conversations list
+Step 4.2: Issue Analysis Interface
+- Build IssueAnalysisPanel:
+  - Display parsed problem information
+  - Show extracted keywords and classifications
+  - Present urgency level and reasoning
+  - Provide tool/parts recommendations
+- Create ActionRecommendations:
+  - Generate preparation checklist
+  - Suggest tools to bring
+  - Estimate job complexity and time
+  - Calculate preliminary pricing
+Step 4.3: Analytics and Reporting
+- Implement AnalyticsService:
+  - Track response rates by platform and time
+  - Monitor conversion rates (call to job)
+  - Analyze peak call times and patterns
+  - Generate performance reports
+- Create reporting dashboard:
+  - Daily/weekly/monthly summaries
+  - Platform performance comparison
+  - Template effectiveness analysis
+  - Revenue impact tracking
+Phase 5: Bulgarian Market Customization (Weeks 14-16)
+Step 5.1: Localization and Cultural Adaptation
+- Complete Bulgarian localization:
+  - All UI elements in Bulgarian
+  - Professional terminology for each trade
+  - Cultural context in message templates
+  - Local business hours and holiday calendars
+- Bulgarian trade-specific features:
+  - Electrical license integration (Bulgarian format)
+  - Local pricing structures (Bulgarian leva)
+  - Sofia district coverage mapping
+  - Bulgarian certification display
+Step 5.2: Local Business Integration
+- Bulgarian business tools integration:
+  - ЕИК number validation and display
+  - ДДС number handling for invoices
+  - Local CRM system compatibility
+  - Bulgarian bank payment integration preparation
+- Local market features:
+  - Sofia traffic-aware scheduling hints
+  - Bulgarian holiday and working day awareness
+  - Local competitor analysis tools
+  - Bulgarian review platform integration (Google My Business Bulgaria)
+Phase 6: Testing and Polish (Weeks 17-18)
+Step 6.1: Comprehensive Testing
+- Implement test suites:
+  - Unit tests for all core functions
+  - Integration tests for messaging platforms
+  - End-to-end conversation flow testing
+  - Bulgarian language processing accuracy tests
+- User acceptance testing:
+  - Test with real Bulgarian tradespeople
+  - Validate conversation flows in real scenarios
+  - Verify cultural appropriateness of responses
+  - Performance testing under high call volumes
+Step 6.2: Performance Optimization
+- Optimize app performance:
+  - Background call monitoring efficiency
+  - Message processing speed optimization
+  - Database query optimization
+  - Battery usage minimization
+- Polish user experience:
+  - Smooth animations and transitions
+  - Intuitive Bulgarian interface
+  - Error handling and user feedback
+  - Onboarding flow for new users
+Backend Architecture Plan
+
+My python is installed in E:\Python
+My postgres is installed in E:\postgre
+
+Phase 6.1: Backend Infrastructure Setup (Weeks 17-19)
+
+Step 6.1.1: Core Backend Services
+- Node.js with Express.js REST API server
+- TypeScript for type safety and better development experience
+- PostgreSQL for structured data (users, businesses, certifications)
+- MongoDB for unstructured data (conversations, analytics, logs)
+- Redis for caching, sessions, and real-time data
+- Docker containerization for consistent deployment
+- Kubernetes for orchestration and scaling
+
+Step 6.1.2: Authentication & Authorization
+- JWT-based authentication with refresh tokens
+- Role-based access control (RBAC):
+  - Tradesperson (business owner)
+  - Employee (technician)
+  - Admin (system administrator)
+- OAuth2 integration for social login
+- Multi-factor authentication (MFA) for sensitive operations
+- API rate limiting and security headers
+
+Step 6.1.3: Database Architecture
+PostgreSQL Tables:
+- users (authentication, profiles, preferences)
+- businesses (company info, ЕИК, ДДС, certifications)
+- subscriptions (pricing plans, billing)
+- audit_logs (GDPR compliance, data access tracking)
+
+MongoDB Collections:
+- conversations (AI chat history, analysis)
+- call_logs (missed calls, response data)
+- analytics_events (user interactions, metrics)
+- message_templates (customizable responses)
+
+Redis Storage:
+- user_sessions (active login sessions)
+- conversation_state (real-time chat context)
+- rate_limiting (API throttling)
+- cache_layer (frequently accessed data)
+
+Step 6.1.4: API Design & Documentation
+- RESTful API design with OpenAPI/Swagger documentation
+- GraphQL endpoint for complex data queries
+- Webhook endpoints for messaging platforms
+- Real-time WebSocket connections for live updates
+- API versioning strategy (v1, v2, etc.)
+
+Step 6.1.5: Microservices Architecture
+Core Services:
+- user-service: Authentication, user management
+- business-service: Company data, certifications
+- messaging-service: WhatsApp, Viber, Telegram integration
+- ai-service: Bulgarian NLP, conversation analysis
+- analytics-service: Data processing, reporting
+- notification-service: Email, SMS, push notifications
+- billing-service: Subscriptions, payments
+
+Step 6.1.6: Message Queue & Event Processing
+- Apache Kafka or RabbitMQ for event streaming
+- Event-driven architecture for service communication
+- Dead letter queues for failed message processing
+- Message retry mechanisms with exponential backoff
+- Event sourcing for audit trails
+
+Step 6.1.7: External Integrations
+- WhatsApp Business API (Meta)
+- Viber Business Messages API
+- Telegram Bot API
+- Bulgarian business registries (ЕИК validation)
+- Payment processors (Stripe, PayPal, Bulgarian banks)
+- Email service (SendGrid, AWS SES)
+- SMS service (Twilio, Bulgarian providers)
+
+GDPR Compliance Framework
+Step 6.2: Data Protection & Privacy Implementation
+
+Step 6.2.1: Legal Basis & Data Processing
+Data Processing Legal Basis:
+- Legitimate Interest: Business communication, service delivery
+- Consent: Marketing communications, analytics
+- Contract Performance: Service agreements, billing
+- Legal Obligation: Tax records, business compliance
+
+Data Categories:
+Worker Data (Tradespeople/Employees):
+- Personal: Name, email, phone, address
+- Business: Company info, certifications, licenses
+- Usage: App interactions, performance metrics
+- Communication: Customer conversations, templates
+
+Customer Data (End Users):
+- Contact: Phone number, name (if provided)
+- Communication: Chat messages, call logs
+- Behavioral: Response patterns, preferences
+- Technical: IP address, device info, timestamps
+
+Step 6.2.2: Data Retention Policy
+Retention Periods:
+- Active customer conversations: 2 years
+- Completed service interactions: 5 years (tax/business records)
+- Marketing consent data: Until consent withdrawn
+- System logs and analytics: 1 year
+- Audit trails: 7 years (legal requirement)
+
+Automated Deletion:
+- Scheduled cleanup jobs for expired data
+- User-initiated data deletion (right to erasure)
+- Account closure data purging (30 days after request)
+- Anonymization of analytics data after retention period
+
+Step 6.2.3: Consent Management System
+Consent Collection:
+- Clear, granular consent options during onboarding
+- Separate consent for different processing purposes
+- Double opt-in for marketing communications
+- Consent withdrawal mechanisms in app settings
+
+Consent Types:
+For Workers:
+□ Essential service functionality (required)
+□ Performance analytics and optimization
+□ Marketing communications
+□ Third-party integrations (WhatsApp, Viber, etc.)
+□ Data sharing with business partners
+
+For Customers:
+□ Communication with tradesperson (required for service)
+□ Conversation history storage for service quality
+□ Analytics for service improvement
+□ Marketing communications from tradesperson
+
+Step 6.2.4: Privacy Rights Implementation
+Right to Information:
+- Clear privacy notices in Bulgarian and English
+- Detailed data processing explanations
+- Contact information for data protection officer
+
+Right of Access:
+- User dashboard showing all collected data
+- Data export functionality (JSON, PDF formats)
+- API endpoints for data access requests
+
+Right to Rectification:
+- In-app data editing capabilities
+- Data correction request system
+- Automated data validation and updates
+
+Right to Erasure:
+- Account deletion with data purging
+- Selective data deletion options
+- Right to be forgotten implementation
+
+Right to Data Portability:
+- Export data in machine-readable formats
+- Direct data transfer to other services
+- Standardized data export templates
+
+Right to Object:
+- Opt-out mechanisms for processing
+- Marketing communication unsubscribe
+- Analytics data collection toggle
+
+Step 6.2.5: Security Measures
+Data Encryption:
+- AES-256 encryption for data at rest
+- TLS 1.3 for data in transit
+- End-to-end encryption for sensitive communications
+- Database field-level encryption for PII
+
+Access Controls:
+- Role-based access with least privilege principle
+- Multi-factor authentication for admin access
+- Regular access reviews and deprovisioning
+- Audit logging for all data access
+
+Security Monitoring:
+- Intrusion detection systems
+- Vulnerability scanning and penetration testing
+- Security incident response procedures
+- Regular security audits and compliance checks
+
+Step 6.2.6: Data Processing Agreements (DPA)
+Third-Party Processors:
+- WhatsApp/Meta: Message processing DPA
+- Viber/Rakuten: Communication platform DPA
+- Telegram: Bot platform processing agreement
+- Cloud providers (AWS/Azure/GCP): Infrastructure DPA
+- Analytics providers: Data processing agreements
+
+Processor Requirements:
+- GDPR compliance certification
+- Data processing instructions documentation
+- Security measures implementation
+- Data breach notification procedures
+- Regular compliance audits
+
+Step 6.2.7: Privacy Impact Assessment (PIA)
+High-Risk Processing Activities:
+- Automated decision making (AI conversation analysis)
+- Large-scale personal data processing
+- Cross-border data transfers
+- Profiling for business purposes
+
+Assessment Areas:
+- Data minimization compliance
+- Purpose limitation adherence
+- Storage limitation implementation
+- Accuracy maintenance procedures
+- Security measures adequacy
+
+Step 6.2.8: Data Protection Officer (DPO)
+DPO Responsibilities:
+- GDPR compliance monitoring
+- Privacy impact assessments
+- Data protection training
+- Regulatory authority liaison
+- Data subject rights handling
+
+Contact Information:
+- Email: dpo@servicetextpro.bg
+- Phone: +359 2 XXX XXXX
+- Address: Sofia, Bulgaria
+- Response time: 72 hours maximum
+
+Step 6.2.9: Privacy Notices & Transparency
+Worker Privacy Notice:
+"ServiceText Pro processes your personal data to provide business communication services. We store your business information, conversation data, and usage analytics to improve service quality. Your phone number and business details are retained for 5 years for tax and business compliance. You can access, correct, or delete your data at any time through the app settings."
+
+Customer Privacy Notice:
+"When you contact a ServiceText Pro user, your phone number and messages are processed to facilitate communication and service delivery. We store conversation history for 2 years to ensure service quality. Your data is shared only with the tradesperson you're contacting. You can request data deletion by contacting the business directly or our support team."
+
+Cookie Policy:
+- Essential cookies for app functionality
+- Analytics cookies for service improvement (optional)
+- Marketing cookies for targeted content (optional)
+- Clear cookie consent banners
+
+Step 6.2.10: Compliance Monitoring
+Regular Audits:
+- Quarterly GDPR compliance reviews
+- Annual third-party security audits
+- Data processing activity monitoring
+- Privacy policy updates tracking
+
+Metrics Tracking:
+- Data subject rights request response times
+- Data breach detection and notification times
+- Consent rates and withdrawal patterns
+- Privacy training completion rates
+
+Documentation:
+- Records of processing activities (ROPA)
+- Data protection impact assessments
+- Consent management logs
+- Security incident reports
+
+Technical Implementation
+Backend Services Stack:
+
+Authentication Service:
+- Node.js with Express and TypeScript
+- PostgreSQL for user data
+- Redis for session management
+- JWT with refresh token rotation
+
+Business Service:
+- Company data management
+- ЕИК/ДДС validation APIs
+- Certification tracking
+- GDPR compliance endpoints
+
+Messaging Service:
+- Multi-platform integration
+- Message queue processing
+- Delivery status tracking
+- GDPR-compliant data handling
+
+AI Service:
+- Bulgarian NLP processing
+- Conversation analysis
+- Privacy-preserving analytics
+- Anonymized training data
+
+Analytics Service:
+- GDPR-compliant metrics
+- Anonymized reporting
+- Data retention management
+- Privacy dashboard
+
+Notification Service:
+- Email/SMS delivery
+- Push notifications
+- Consent-based communications
+- Unsubscribe management
+
+Mobile App Integration:
+
+React Native for cross-platform development
+Redux Toolkit for state management
+React Navigation for app navigation
+AsyncStorage for local data persistence (encrypted)
+GDPR consent management UI components
+Privacy dashboard and data export features
+
+External Integrations:
+
+WhatsApp Business API via official Meta API (DPA required)
+Viber Business API for business messaging (DPA required)
+Telegram Bot API for additional platform support
+Bulgarian business registry APIs for validation
+GDPR-compliant analytics tools
+Secure payment processing with PCI compliance
+
+Monitoring & Analytics:
+
+Privacy-focused analytics (no PII tracking)
+Security monitoring and incident response
+Performance monitoring with data anonymization
+Compliance dashboard for GDPR metrics
+
+Success Metrics
+Technical Metrics
+
+Response time: < 2 minutes from missed call to message sent
+Message delivery rate: > 95% successful delivery
+Conversation completion rate: > 80% of started conversations reach completion
+AI accuracy: > 85% correct issue classification
+
+Business Metrics
+
+Conversion rate: Missed call to booked job > 40%
+Customer satisfaction: > 4.5/5 rating for automated responses
+Time savings: 30+ minutes saved per day per tradesperson
+Revenue impact: 15-25% increase in captured business opportunities

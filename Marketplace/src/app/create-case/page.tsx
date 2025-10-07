@@ -75,51 +75,57 @@ export default function CreateCasePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 relative overflow-hidden">
+      {/* Industrial background elements */}
+      <div className="absolute inset-0">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-indigo-500/10 to-slate-500/10 rounded-lg blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-br from-purple-500/10 to-slate-500/10 rounded-lg blur-3xl"></div>
+      </div>
+
       <Header />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="relative z-10 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Page Header */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            <h1 className="text-4xl font-bold text-white mb-4">
               Създай нова заявка
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-xl text-slate-300 mb-8">
               Опишете услугата, която търсите и ние ще ви свържем с подходящи майстори
             </p>
           </div>
 
           {/* Instructions */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+          <div className="bg-white/10 backdrop-blur-md rounded-xl shadow-xl border border-white/20 p-6 mb-8">
+            <h2 className="text-2xl font-semibold text-white mb-6">
               Как работи?
             </h2>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-400/30 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">📝</span>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">1. Опишете проблема</h3>
-                <p className="text-gray-600 text-sm">
+                <h3 className="font-semibold text-white mb-2">1. Опишете проблема</h3>
+                <p className="text-slate-300 text-sm">
                   Разкажете какво точно ви трябва и кога
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-400/30 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🔍</span>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">2. Получете оферти</h3>
-                <p className="text-gray-600 text-sm">
+                <h3 className="font-semibold text-white mb-2">2. Получете оферти</h3>
+                <p className="text-slate-300 text-sm">
                   Специалистите ще ви изпратят своите предложения
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-400/30 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">✅</span>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">3. Изберете най-добрия</h3>
-                <p className="text-gray-600 text-sm">
+                <h3 className="font-semibold text-white mb-2">3. Изберете най-добрия</h3>
+                <p className="text-slate-300 text-sm">
                   Сравнете офертите и изберете подходящия майстор
                 </p>
               </div>
@@ -130,7 +136,7 @@ export default function CreateCasePage() {
           <div className="text-center">
             <button
               onClick={() => setCaseModalOpen(true)}
-              className="bg-gradient-to-r from-green-600 to-blue-600 text-white py-4 px-8 rounded-lg hover:from-green-700 hover:to-blue-700 text-lg font-medium shadow-lg hover:shadow-xl transition-all"
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-8 rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300 text-lg font-medium"
             >
               📋 Създай заявка сега
             </button>

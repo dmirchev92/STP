@@ -122,7 +122,7 @@ export class ReviewService {
       const caseExists = await new Promise<boolean>((resolve, reject) => {
         this.db.db.get(
           `SELECT id FROM marketplace_service_cases 
-           WHERE id = ? AND customer_id = ? AND provider_id = ? AND status = 'closed'`,
+           WHERE id = ? AND customer_id = ? AND provider_id = ? AND status = 'completed'`,
           [reviewData.caseId, reviewData.customerId, reviewData.providerId],
           (err, row) => {
             if (err) reject(err);
@@ -135,19 +135,26 @@ export class ReviewService {
         throw new Error('Case not found or not completed');
       }
 
-      // Check if review already exists
-      const existingReview = await new Promise<boolean>((resolve, reject) => {
+      // Check if review already exists (with detailed logging)
+      const existingReview = await new Promise<any>((resolve, reject) => {
         this.db.db.get(
-          'SELECT id FROM case_reviews WHERE case_id = ? AND customer_id = ? AND provider_id = ?',
+          'SELECT id, created_at FROM case_reviews WHERE case_id = ? AND customer_id = ? AND provider_id = ?',
           [reviewData.caseId, reviewData.customerId, reviewData.providerId],
           (err, row) => {
             if (err) reject(err);
-            else resolve(!!row);
+            else resolve(row);
           }
         );
       });
 
       if (existingReview) {
+        logger.warn('⚠️ Duplicate review attempt blocked', {
+          existingReviewId: existingReview.id,
+          existingCreatedAt: existingReview.created_at,
+          caseId: reviewData.caseId,
+          customerId: reviewData.customerId,
+          providerId: reviewData.providerId
+        });
         throw new Error('Review already exists for this case');
       }
 
@@ -320,7 +327,7 @@ export class ReviewService {
       const result = await new Promise<any>((resolve, reject) => {
         this.db.db.get(
           `SELECT 
-            CASE WHEN c.status = 'closed' AND c.customer_id = ? AND r.id IS NULL 
+            CASE WHEN c.status = 'completed' AND c.customer_id = ? AND r.id IS NULL 
             THEN 1 ELSE 0 END as can_review
            FROM marketplace_service_cases c
            LEFT JOIN case_reviews r ON c.id = r.case_id AND r.customer_id = ?
@@ -352,7 +359,7 @@ export class ReviewService {
            FROM marketplace_service_cases c
            LEFT JOIN case_reviews r ON c.id = r.case_id AND r.customer_id = ?
            WHERE c.customer_id = ? 
-             AND c.status = 'closed' 
+             AND c.status = 'completed' 
              AND r.id IS NULL
            ORDER BY c.completed_at DESC`,
           [customerId, customerId],
@@ -390,10 +397,10 @@ export class ReviewService {
     try {
       const stats = await this.getProviderReviewStats(providerId);
       
-      // Update service_providers table with latest rating
+      // Update service_provider_profiles table with latest rating
       await new Promise<void>((resolve, reject) => {
         this.db.db.run(
-          `UPDATE service_providers 
+          `UPDATE service_provider_profiles 
            SET rating = ?, total_reviews = ?, updated_at = datetime('now')
            WHERE user_id = ?`,
           [stats.averageRating, stats.totalReviews, providerId],

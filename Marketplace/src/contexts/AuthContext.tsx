@@ -7,20 +7,22 @@ interface User {
   email: string
   firstName: string
   lastName: string
-  role: 'customer' | 'tradesperson' | 'service_provider'
+  role: 'customer' | 'tradesperson' | 'service_provider' | 'admin'
   phoneNumber?: string
   companyName?: string
   serviceCategory?: string
+  profileImageUrl?: string
 }
 
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; debugInfo?: any }>
   logout: () => void
   register: (userData: any) => Promise<boolean>
   refreshToken: () => Promise<boolean>
+  updateUser: (updatedUser: User) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -48,6 +50,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (token && userData) {
         try {
           const parsedUser = JSON.parse(userData)
+          
+          // Fetch profile image if user is a service provider
+          if (parsedUser.role === 'tradesperson' || parsedUser.role === 'service_provider') {
+            try {
+              console.log('🖼️ AuthContext - Fetching profile image for user:', parsedUser.id)
+              const profileResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.129:3000/api/v1'}/marketplace/providers/${parsedUser.id}`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              })
+              const profileData = await profileResponse.json()
+              console.log('🖼️ AuthContext - Profile data response:', profileData)
+              console.log('🖼️ AuthContext - Profile image URL from API:', profileData.data?.profileImageUrl)
+              
+              if (profileData.success && profileData.data?.profileImageUrl) {
+                parsedUser.profileImageUrl = profileData.data.profileImageUrl
+                console.log('✅ AuthContext - Set profile image URL:', parsedUser.profileImageUrl)
+                // Update localStorage with profile image
+                localStorage.setItem('user_data', JSON.stringify(parsedUser))
+              } else {
+                console.log('⚠️ AuthContext - No profile image URL in response')
+              }
+            } catch (profileError) {
+              console.log('❌ AuthContext - Could not fetch profile image:', profileError)
+            }
+          }
+          
           setUser(parsedUser)
           console.log('✅ AuthContext - Loaded user from localStorage:', parsedUser)
         } catch (parseError) {
@@ -69,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; debugInfo?: any }> => {
     try {
       console.log('🔐 AuthContext - Starting login process...')
       
@@ -92,27 +121,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result.data.tokens.refreshToken) {
           localStorage.setItem('refresh_token', result.data.tokens.refreshToken)
         }
-        localStorage.setItem('user_data', JSON.stringify(result.data.user))
+        
+        const loggedInUser = result.data.user
+        
+        // Fetch profile image immediately after login for service providers
+        if (loggedInUser.role === 'tradesperson' || loggedInUser.role === 'service_provider') {
+          try {
+            console.log('🖼️ AuthContext - Fetching profile image after login for user:', loggedInUser.id)
+            const profileResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.129:3000/api/v1'}/marketplace/providers/${loggedInUser.id}`, {
+              headers: {
+                'Authorization': `Bearer ${result.data.tokens.accessToken}`
+              }
+            })
+            const profileData = await profileResponse.json()
+            console.log('🖼️ AuthContext - Profile data after login:', profileData)
+            console.log('🖼️ AuthContext - Profile image URL:', profileData.data?.profileImageUrl)
+            
+            if (profileData.success && profileData.data?.profileImageUrl) {
+              loggedInUser.profileImageUrl = profileData.data.profileImageUrl
+              console.log('✅ AuthContext - Set profile image URL after login:', loggedInUser.profileImageUrl)
+            } else {
+              console.log('⚠️ AuthContext - No profile image URL in response after login')
+            }
+          } catch (profileError) {
+            console.log('❌ AuthContext - Could not fetch profile image after login:', profileError)
+          }
+        }
+        
+        // Store updated user data with profile image
+        localStorage.setItem('user_data', JSON.stringify(loggedInUser))
         
         // Update state immediately
-        setUser(result.data.user)
+        setUser(loggedInUser)
         setIsLoading(false)
         
-        console.log('✅ AuthContext - User state updated:', result.data.user)
+        console.log('✅ AuthContext - User state updated:', loggedInUser)
         
         // Dispatch custom event for any components listening
         window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-          detail: { user: result.data.user, isAuthenticated: true }
+          detail: { user: loggedInUser, isAuthenticated: true }
         }))
         
-        return true
+        return { success: true }
       } else {
         console.error('❌ AuthContext - Login failed:', result)
-        return false
+        
+        // Extract detailed error message and debug info
+        const errorMessage = result.error?.message || 'Login failed. Please check your credentials.';
+        const debugInfo = result.error?.details || null;
+        
+        console.log('🔍 AuthContext - Error details:', {
+          message: errorMessage,
+          debugInfo: debugInfo
+        });
+        
+        return { 
+          success: false, 
+          error: errorMessage,
+          debugInfo: debugInfo
+        }
       }
     } catch (error) {
       console.error('❌ AuthContext - Login error:', error)
-      return false
+      return { 
+        success: false, 
+        error: 'Network error. Please check your connection and try again.'
+      }
     }
   }
 
@@ -182,6 +256,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser)
+    localStorage.setItem('user_data', JSON.stringify(updatedUser))
+    console.log('✅ AuthContext - User updated:', updatedUser)
+  }
+
   // Auto-refresh token every 90 minutes (before 2h expiration)
   useEffect(() => {
     if (!user) return
@@ -204,7 +284,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     register,
-    refreshToken
+    refreshToken,
+    updateUser
   }
 
   return (

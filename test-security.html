@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SMS Security Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 0; }
+        #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🔒 SMS Security Test</h1>
+    <p><strong>Instructions:</strong></p>
+    <ol>
+        <li>Make sure you're logged into your SMS system</li>
+        <li>Click the "Run Security Tests" button below</li>
+        <li>Wait for results to appear</li>
+    </ol>
+    
+    <button onclick="runTests()">🧪 Run Security Tests</button>
+    
+    <div id="results"></div>
+
+    <script>
+        async function runTests() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">🔄 Running tests...</div>';
+            
+            // Check if user is logged in by trying to get auth token
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                resultsDiv.innerHTML = `
+                    <div class="fail">❌ ERROR: You need to be logged in first!</div>
+                    <div class="info">Please go to <a href="http://192.168.0.129:3002/settings/sms" target="_blank">SMS Settings</a> and login first.</div>
+                `;
+                return;
+            }
+            
+            let results = '<h2>🧪 Test Results:</h2>';
+            
+            // Test 1: Authentication Protection
+            results += '<h3>Test 1: Authentication Protection</h3>';
+            try {
+                const response = await fetch('http://192.168.0.129:3000/api/v1/sms/config');
+                const data = await response.json();
+                
+                if (data.error && data.error.code === 'NO_TOKEN') {
+                    results += '<div class="pass">✅ PASS: System blocks unauthorized access</div>';
+                } else {
+                    results += '<div class="fail">❌ FAIL: System allows unauthorized access</div>';
+                }
+            } catch (error) {
+                results += '<div class="fail">❌ ERROR: Could not test authentication</div>';
+            }
+            
+            // Test 2: Premium Number Blocking
+            results += '<h3>Test 2: Premium Number Blocking</h3>';
+            const premiumNumbers = [
+                { number: '0900123456', name: 'Premium 0900 number' },
+                { number: '1234', name: 'Short premium number' },
+                { number: '+359888123456', name: 'Normal mobile (should be allowed)' }
+            ];
+            
+            for (const test of premiumNumbers) {
+                try {
+                    const response = await fetch('http://192.168.0.129:3000/api/v1/sms/test-security', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            phoneNumber: test.number,
+                            message: 'Test message'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        const testResult = result.data?.testResult;
+                        
+                        if (test.number === '+359888123456') {
+                            // Normal number should be allowed
+                            if (testResult === 'ALLOWED') {
+                                results += `<div class="pass">✅ PASS: ${test.name} - Correctly allowed</div>`;
+                            } else {
+                                results += `<div class="fail">❌ FAIL: ${test.name} - Should be allowed but was ${testResult}</div>`;
+                            }
+                        } else {
+                            // Premium numbers should be blocked
+                            if (testResult === 'BLOCKED') {
+                                results += `<div class="pass">✅ PASS: ${test.name} - Correctly blocked</div>`;
+                            } else {
+                                results += `<div class="fail">❌ FAIL: ${test.name} - Should be blocked but was ${testResult}</div>`;
+                            }
+                        }
+                    } else {
+                        results += `<div class="info">ℹ️ INFO: ${test.name} - Test endpoint not available</div>`;
+                    }
+                } catch (error) {
+                    results += `<div class="info">ℹ️ INFO: ${test.name} - Could not test (${error.message})</div>`;
+                }
+            }
+            
+            // Test 3: Suspicious Content Filtering
+            results += '<h3>Test 3: Suspicious Content Filtering</h3>';
+            const contentTests = [
+                { message: 'Hello, normal message', expected: 'ALLOWED', name: 'Normal message' },
+                { message: 'Click here to win money: http://evil-site.com', expected: 'BLOCKED', name: 'Suspicious content' },
+                { message: 'Premium service - you will be charged', expected: 'BLOCKED', name: 'Premium warning' }
+            ];
+            
+            for (const test of contentTests) {
+                try {
+                    const response = await fetch('http://192.168.0.129:3000/api/v1/sms/test-security', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            phoneNumber: '+359888123456',
+                            message: test.message
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        const testResult = result.data?.testResult;
+                        
+                        if (testResult === test.expected) {
+                            results += `<div class="pass">✅ PASS: ${test.name} - Correctly ${testResult.toLowerCase()}</div>`;
+                        } else {
+                            results += `<div class="fail">❌ FAIL: ${test.name} - Expected ${test.expected}, got ${testResult}</div>`;
+                        }
+                    } else {
+                        results += `<div class="info">ℹ️ INFO: ${test.name} - Test endpoint not available</div>`;
+                    }
+                } catch (error) {
+                    results += `<div class="info">ℹ️ INFO: ${test.name} - Could not test</div>`;
+                }
+            }
+            
+            results += '<h3>📋 Summary</h3>';
+            results += '<div class="info">If you see mostly ✅ PASS results, your security is working correctly!</div>';
+            results += '<div class="info">If you see ❌ FAIL results, there may be security issues that need attention.</div>';
+            
+            resultsDiv.innerHTML = results;
+        }
+    </script>
+</body>
+</html>

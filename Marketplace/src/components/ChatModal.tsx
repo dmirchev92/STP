@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import UnifiedCaseModal from './UnifiedCaseModal';
 import ServiceRequestButton from './ServiceRequestButton';
+import SurveyModal from './SurveyModal';
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -36,11 +37,13 @@ interface ServiceProvider {
 interface Message {
   id: string
   conversationId: string
-  senderType: 'customer' | 'provider'
+  senderType: 'customer' | 'provider' | 'system'
   senderName: string
   message: string
   messageType?: string
   timestamp: string
+  data?: any // For additional message data like caseId
+  caseId?: string // Direct case ID for survey messages
 }
 
 interface ChatModalProps {
@@ -64,6 +67,8 @@ export default function ChatModal({ provider, isOpen, onClose }: ChatModalProps)
   const [currentTemplate, setCurrentTemplate] = useState<any>(null)
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
   const [modalMode, setModalMode] = useState<'template' | 'direct'>('direct')
+  const [showSurveyModal, setShowSurveyModal] = useState(false)
+  const [surveyCase, setSurveyCase] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Storage keys for persistence
@@ -359,52 +364,89 @@ ${Object.entries(formData).map(([key, value]) => {
     if (!conversationId) return
     
     try {
-      // Create case message with uploaded screenshots
-      let caseMessage = `📋 Нова заявка за услуга:
+      console.log('📋 ChatModal - Creating case with data:', caseData)
+      console.log('📋 ChatModal - Provider object:', provider)
+      console.log('📋 ChatModal - Assignment type:', caseData.assignmentType)
+      
+      // Prepare case data for API
+      const casePayload = {
+        serviceType: caseData.serviceType,
+        description: caseData.description,
+        preferredDate: caseData.preferredDate,
+        preferredTime: caseData.preferredTime,
+        priority: caseData.priority || 'normal',
+        address: caseData.address,
+        phone: caseData.phone,
+        additionalDetails: caseData.additionalDetails || '',
+        // Handle assignment based on "тип заявка" selection
+        assignmentType: caseData.assignmentType || 'specific',
+        providerId: caseData.assignmentType === 'specific' ? provider.id : null,
+        conversationId: conversationId,
+        customerId: user!.id, // Add the actual user ID
+        customerName: customerName,
+        customerEmail: customerEmail,
+        customerPhone: customerPhone
+      }
+      console.log('📋 ChatModal - Case payload:', casePayload)
+      console.log('📋 ChatModal - Final providerId for assignment:', casePayload.providerId)
+      console.log('📋 ChatModal - Assignment logic: assignmentType =', caseData.assignmentType, 'provider.id =', provider.id)
+
+      // Create the actual case in the system
+      const caseResponse = await apiClient.createCase(casePayload)
+      
+      if (caseResponse.data?.success) {
+        const createdCase = caseResponse.data.data
+        console.log('✅ ChatModal - Case created successfully:', createdCase)
+
+        // Create a notification message in the chat
+        let notificationMessage = `✅ Заявката е създадена успешно!
+
+📋 Номер на заявката: #${createdCase.id}
 🔧 Услуга: ${caseData.serviceType}
-📝 Описание: ${caseData.description}
+📍 Адрес: ${caseData.address}
 📅 Дата: ${caseData.preferredDate}
 ⏰ Време: ${caseData.preferredTime || 'Сутрин (8:00-12:00)'}
-⚡ Приоритет: ${caseData.priority === 'urgent' ? 'Спешно' : caseData.priority === 'low' ? 'Нисък' : 'Нормален'}
-📍 Адрес: ${caseData.address}
-📞 Телефон: ${caseData.phone}`
 
-      if (caseData.additionalDetails) {
-        caseMessage += `\n💬 Допълнителни детайли: ${caseData.additionalDetails}`
+${caseData.assignmentType === 'specific' 
+  ? `🎯 Заявката е насочена директно към ${provider.businessName || provider.business_name}`
+  : '🌐 Заявката е поставена в общата опашка за всички специалисти'
+}`
+
+        // Try to send notification message to chat (non-critical)
+        try {
+          await apiClient.sendMessage({
+            conversationId,
+            senderType: 'customer',
+            senderName: customerName,
+            message: notificationMessage,
+            messageType: 'case_created'
+          })
+
+          // Add message to local state
+          const newMessage: Message = {
+            id: Date.now().toString(),
+            conversationId: conversationId!,
+            senderType: 'customer',
+            senderName: customerName,
+            message: notificationMessage,
+            messageType: 'case_created',
+            timestamp: new Date().toISOString()
+          }
+          setMessages(prev => [...prev, newMessage])
+        } catch (chatError) {
+          console.error('📋 ChatModal - Failed to send chat notification (non-critical):', chatError)
+          // Don't throw error here since case was created successfully
+        }
+
+        // Show success feedback
+        alert(`Заявката е създадена успешно! Номер: #${createdCase.id}`)
+        
+      } else {
+        throw new Error(caseResponse.data?.message || 'Грешка при създаването на заявката')
       }
-
-      if (caseData.screenshots && caseData.screenshots.length > 0) {
-        caseMessage += `\n📸 Прикачени ${caseData.screenshots.length} снимки`
-      }
-
-      // Send the case message
-      const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.129:3000/api/v1'}/chat/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId,
-          senderType: 'customer',
-          senderName: customerName,
-          message: caseMessage,
-          messageType: 'case_created'
-        })
-      });
-
-      if (messageResponse.ok) {
-        // Add message to local state
-        const newMessage: Message = {
-          id: Date.now().toString(),
-          conversationId: conversationId!,
-          senderType: 'customer',
-          senderName: customerName,
-          message: caseMessage,
-          messageType: 'case_created',
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, newMessage]);
-      }
+      
       setShowUnifiedModal(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating case:', error)
       alert('Възникна грешка при създаването на заявката')
     }
@@ -473,21 +515,21 @@ ${Object.entries(formData).map(([key, value]) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 h-96 flex flex-col">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-800 rounded-xl shadow-2xl w-full max-w-md mx-4 h-96 flex flex-col border border-white/20">
         {/* Header */}
-        <div className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-t-xl flex justify-between items-center">
           <div>
             <h3 className="font-semibold">
               {provider.businessName || provider.business_name || `${provider.firstName || provider.first_name} ${provider.lastName || provider.last_name}`}
             </h3>
-            <p className="text-sm text-blue-200">
+            <p className="text-sm text-white/80">
               {provider.serviceCategory || provider.service_category}
             </p>
           </div>
           <button
             onClick={handleClose}
-            className="text-blue-200 hover:text-white"
+            className="text-white/80 hover:text-white transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -496,9 +538,9 @@ ${Object.entries(formData).map(([key, value]) => {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-900/50">
           {loading && messages.length === 0 ? (
-            <div className="text-center text-gray-500">Зареждане...</div>
+            <div className="text-center text-slate-400">Зареждане...</div>
           ) : (
             messages.map((msg) => (
               <div
@@ -508,8 +550,8 @@ ${Object.entries(formData).map(([key, value]) => {
                 <div
                   className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
                     msg.senderType === 'customer'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-800'
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                      : 'bg-slate-700 text-slate-100 border border-slate-600'
                   }`}
                 >
                   <div>{msg.message}</div>
@@ -518,7 +560,7 @@ ${Object.entries(formData).map(([key, value]) => {
                   {msg.messageType === 'case_template' && msg.senderType === 'provider' && (
                     <button
                       onClick={() => handleCaseTemplateClick(msg)}
-                      className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                      className="mt-2 px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs rounded hover:shadow-lg transform hover:scale-105 transition-all duration-300"
                     >
                       📋 Попълни формата
                     </button>
@@ -528,17 +570,67 @@ ${Object.entries(formData).map(([key, value]) => {
                   {msg.messageType === 'service_request' && msg.senderType === 'provider' && (
                     <div className="mt-2">
                       <ServiceRequestButton 
+                        providerName={provider.businessName || provider.business_name || `${provider.firstName || provider.first_name} ${provider.lastName || provider.last_name}`}
                         onClick={() => {
                           setModalMode('direct');
                           setShowUnifiedModal(true);
                         }}
-                        providerName={provider.businessName || provider.business_name || 'специалиста'}
                       />
                     </div>
                   )}
+
+                  {/* Show survey button for survey_request messages */}
+                  {msg.messageType === 'survey_request' && (
+                    <button
+                      onClick={async () => {
+                        // Extract case ID from message data
+                        console.log('🔍 Survey button clicked, message data:', msg);
+                        let caseId = msg.caseId;
+                        
+                        // Try to parse data field if it exists
+                        if (msg.data) {
+                          try {
+                            const parsedData = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
+                            console.log('🔍 Parsed message data:', parsedData);
+                            caseId = parsedData.caseId || caseId;
+                          } catch (e) {
+                            console.log('Could not parse message data:', msg.data);
+                          }
+                        }
+                        
+                        console.log('🔍 Final caseId extracted:', caseId);
+                        
+                        if (caseId) {
+                          try {
+                            // Fetch case details for the survey
+                            const response = await apiClient.getCase(caseId);
+                            if (response.data?.success) {
+                              setSurveyCase({
+                                id: caseId,
+                                providerName: provider.businessName || provider.business_name || `${provider.firstName || provider.first_name} ${provider.lastName || provider.last_name}`,
+                                serviceType: response.data.data.service_type,
+                                completedAt: response.data.data.completed_at,
+                                description: response.data.data.description
+                              });
+                              setShowSurveyModal(true);
+                            }
+                          } catch (error) {
+                            console.error('Error fetching case details:', error);
+                            alert('Възникна грешка при зареждането на детайлите за заявката');
+                          }
+                        } else {
+                          alert('Не може да се намери ID на заявката');
+                        }
+                      }}
+                      className="mt-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 flex items-center space-x-2"
+                    >
+                      <span>⭐</span>
+                      <span>Оценете услугата</span>
+                    </button>
+                  )}
                   
                   <div className={`text-xs mt-1 ${
-                    msg.senderType === 'customer' ? 'text-blue-200' : 'text-gray-500'
+                    msg.senderType === 'customer' ? 'text-white/60' : 'text-slate-400'
                   }`}>
                     {new Date(msg.timestamp).toLocaleTimeString('bg-BG', {
                       hour: '2-digit',
@@ -554,7 +646,7 @@ ${Object.entries(formData).map(([key, value]) => {
 
         {/* Input Section */}
         {isStarted && (
-          <div className="border-t p-4">
+          <div className="border-t border-slate-700 p-4 bg-slate-800/50">
             <div className="flex space-x-2 mb-3">
               <input
                 type="text"
@@ -562,13 +654,13 @@ ${Object.entries(formData).map(([key, value]) => {
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                 placeholder="Напишете съобщение..."
-                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                 disabled={loading}
               />
               <button
                 onClick={sendMessage}
                 disabled={!newMessage.trim() || loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:scale-105 transition-all duration-300"
               >
                 {loading ? '...' : 'Изпрати'}
               </button>
@@ -592,33 +684,33 @@ ${Object.entries(formData).map(([key, value]) => {
 
         {/* Start Chat Form */}
         {!isStarted && !loading && (
-          <div className="p-4 border-t">
+          <div className="p-4 border-t border-slate-700 bg-slate-800/50">
             <div className="space-y-3">
               <input
                 type="text"
                 placeholder="Вашето име"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
               <input
                 type="email"
                 placeholder="Email адрес"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
               <input
                 type="tel"
                 placeholder="Телефон"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
               <button
                 onClick={() => startConversation()}
                 disabled={!customerName || !customerEmail}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:scale-105 transition-all duration-300"
               >
                 Започни разговор
               </button>
@@ -640,6 +732,57 @@ ${Object.entries(formData).map(([key, value]) => {
         onSubmit={modalMode === 'template' ? handleTemplateSubmit : handleCaseCreation}
         isSubmitting={isSubmittingTemplate}
         providerName={provider.businessName || provider.business_name || 'специалиста'}
+        providerId={provider.id}
+        providerCategory={provider.serviceCategory || provider.service_category}
+        customerPhone={customerPhone}
+      />
+    )}
+
+    {/* Survey Modal */}
+    {showSurveyModal && surveyCase && (
+      <SurveyModal
+        isOpen={showSurveyModal}
+        onClose={() => {
+          setShowSurveyModal(false);
+          setSurveyCase(null);
+        }}
+        caseId={surveyCase.id}
+        providerId={provider.id}
+        providerName={provider.businessName || provider.business_name || `${provider.firstName || provider.first_name} ${provider.lastName || provider.last_name}`}
+        onSubmitSuccess={async () => {
+          // Send a thank you message to the chat
+          const thankYouMessage = `✅ Благодарим ви за оценката! 
+
+Вашето мнение е важно за нас и помага на други клиенти да направят правилния избор.`;
+
+          try {
+            await apiClient.sendMessage({
+              conversationId: conversationId!,
+              senderType: 'customer',
+              senderName: customerName,
+              message: thankYouMessage,
+              messageType: 'text'
+            });
+
+            // Add thank you message to local state
+            const newMessage: Message = {
+              id: Date.now().toString(),
+              conversationId: conversationId!,
+              senderType: 'customer',
+              senderName: customerName,
+              message: thankYouMessage,
+              messageType: 'text',
+              timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, newMessage]);
+          } catch (error) {
+            console.error('Error sending thank you message:', error);
+          }
+
+          setShowSurveyModal(false);
+          setSurveyCase(null);
+          alert('Благодарим ви за оценката!');
+        }}
       />
     )}
   </div>

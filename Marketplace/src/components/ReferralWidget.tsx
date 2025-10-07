@@ -18,11 +18,27 @@ interface ReferralStats {
   }
 }
 
+interface ReferredUser {
+  referredUser: {
+    id: string
+    firstName: string
+    lastName: string
+    businessName?: string
+  }
+  totalClicks: number
+  validClicks: number
+  monthlyClicks: number
+  status: string
+  profileUrl: string
+}
+
 export default function ReferralWidget() {
   const { user, isAuthenticated } = useAuth()
   const [stats, setStats] = useState<ReferralStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiedLink, setCopiedLink] = useState(false)
+  const [showReferredUsers, setShowReferredUsers] = useState(false)
+  const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([])
 
   useEffect(() => {
     if (isAuthenticated && user && (user.role === 'service_provider' || user.role === 'tradesperson')) {
@@ -61,6 +77,9 @@ export default function ReferralWidget() {
           earnedRewards: data.totalRewards?.length || 0,
           nextRewardProgress: nextReward
         })
+        
+        // Store referred users for dropdown
+        setReferredUsers(data.referredUsers || [])
       }
     } catch (error) {
       console.error('Error fetching referral stats:', error)
@@ -81,6 +100,14 @@ export default function ReferralWidget() {
     }
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'text-green-300 bg-green-500/20 border-green-400/30'
+      case 'pending': return 'text-yellow-300 bg-yellow-500/20 border-yellow-400/30'
+      default: return 'text-slate-300 bg-slate-500/20 border-slate-400/30'
+    }
+  }
+
   // Don't show widget for customers
   if (!isAuthenticated || !user || (user.role !== 'service_provider' && user.role !== 'tradesperson')) {
     return null
@@ -88,12 +115,12 @@ export default function ReferralWidget() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-6">
+      <div className="bg-white/10 backdrop-blur-md rounded-lg shadow-xl border border-white/20 p-6">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-white/20 rounded w-1/3 mb-4"></div>
           <div className="space-y-3">
-            <div className="h-3 bg-gray-200 rounded"></div>
-            <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+            <div className="h-3 bg-white/20 rounded"></div>
+            <div className="h-3 bg-white/20 rounded w-2/3"></div>
           </div>
         </div>
       </div>
@@ -102,9 +129,9 @@ export default function ReferralWidget() {
 
   if (!stats) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">🤝 Препоръчителна система</h3>
-        <p className="text-gray-600 text-sm">Неуспешно зареждане на данните за препоръки.</p>
+      <div className="bg-white/10 backdrop-blur-md rounded-lg shadow-xl border border-white/20 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">🤝 Препоръчителна система</h3>
+        <p className="text-slate-300 text-sm">Неуспешно зареждане на данните за препоръки.</p>
       </div>
     )
   }
@@ -112,12 +139,12 @@ export default function ReferralWidget() {
   const progressPercentage = Math.min((stats.nextRewardProgress.current / stats.nextRewardProgress.target) * 100, 100)
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
+    <div className="bg-white/10 backdrop-blur-md rounded-lg shadow-xl border border-white/20 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">🤝 Препоръчителна система</h3>
+        <h3 className="text-lg font-semibold text-white">🤝 Препоръчителна система</h3>
         <a
           href="/referrals"
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          className="text-indigo-400 hover:text-indigo-300 text-sm font-medium transition-colors"
         >
           Виж всички →
         </a>
@@ -125,78 +152,109 @@ export default function ReferralWidget() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="text-center p-3 bg-blue-50 rounded-lg">
-          <div className="text-2xl font-bold text-blue-600">{stats.totalReferrals}</div>
-          <div className="text-xs text-gray-600">Препоръки</div>
+        <div className="text-center p-3 bg-indigo-500/20 border border-indigo-400/30 rounded-lg">
+          <div className="text-2xl font-bold text-indigo-400">{stats.totalReferrals}</div>
+          <div className="text-xs text-slate-300">Препоръки</div>
         </div>
-        <div className="text-center p-3 bg-green-50 rounded-lg">
-          <div className="text-2xl font-bold text-green-600">{stats.totalClicks}</div>
-          <div className="text-xs text-gray-600">Общо кликове</div>
+        <div className="text-center p-3 bg-green-500/20 border border-green-400/30 rounded-lg">
+          <div className="text-2xl font-bold text-green-400">{stats.totalClicks}</div>
+          <div className="text-xs text-slate-300">Общо кликове</div>
         </div>
-        <div className="text-center p-3 bg-purple-50 rounded-lg">
-          <div className="text-2xl font-bold text-purple-600">{stats.monthlyClicks}</div>
-          <div className="text-xs text-gray-600">Този месец</div>
+        <div className="text-center p-3 bg-purple-500/20 border border-purple-400/30 rounded-lg">
+          <div className="text-2xl font-bold text-purple-400">{stats.monthlyClicks}</div>
+          <div className="text-xs text-slate-300">Този месец</div>
         </div>
-        <div className="text-center p-3 bg-yellow-50 rounded-lg">
-          <div className="text-2xl font-bold text-yellow-600">{stats.earnedRewards}</div>
-          <div className="text-xs text-gray-600">Награди</div>
+        <div className="text-center p-3 bg-yellow-500/20 border border-yellow-400/30 rounded-lg">
+          <div className="text-2xl font-bold text-yellow-400">{stats.earnedRewards}</div>
+          <div className="text-xs text-slate-300">Награди</div>
         </div>
       </div>
 
       {/* Progress to Next Reward */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">Следваща награда</span>
-          <span className="text-sm text-gray-600">
+          <span className="text-sm font-medium text-white">Следваща награда</span>
+          <span className="text-sm text-slate-300">
             {stats.nextRewardProgress.current}/{stats.nextRewardProgress.target} кликове
           </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-white/20 rounded-full h-2">
           <div 
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
             style={{ width: `${progressPercentage}%` }}
           ></div>
         </div>
-        <p className="text-xs text-gray-600 mt-1">{stats.nextRewardProgress.rewardType}</p>
+        <p className="text-xs text-slate-300 mt-1">{stats.nextRewardProgress.rewardType}</p>
       </div>
 
-      {/* Referral Link */}
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1 mr-3">
-            <p className="text-xs text-gray-600 mb-1">Вашият код:</p>
-            <p className="font-mono text-sm font-bold text-blue-600">{stats.referralCode}</p>
-          </div>
+      {/* Referred Users Dropdown */}
+      {referredUsers.length > 0 && (
+        <div className="border-t border-white/10 pt-4">
           <button
-            onClick={copyReferralLink}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              copiedLink 
-                ? 'bg-green-600 text-white' 
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
+            onClick={() => setShowReferredUsers(!showReferredUsers)}
+            className="w-full flex items-center justify-between p-3 text-left hover:bg-white/5 rounded-lg transition-colors"
           >
-            {copiedLink ? '✓' : '📋'}
+            <div className="flex items-center space-x-2">
+              <span className="text-white font-medium">👥 Препоръчани потребители</span>
+              <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded-full border border-indigo-400/30">
+                {referredUsers.length}
+              </span>
+            </div>
+            <svg
+              className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${
+                showReferredUsers ? 'rotate-180' : ''
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
-        </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="flex gap-2">
-        <a
-          href={`https://wa.me/?text=${encodeURIComponent(`Присъедини се към ServiceText Pro и получи достъп до най-добрите майстори в България! ${stats.referralLink}`)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 bg-green-600 text-white text-center py-2 px-3 rounded-lg hover:bg-green-700 text-sm font-medium"
-        >
-          📱 WhatsApp
-        </a>
-        <a
-          href="/referrals"
-          className="flex-1 bg-gray-200 text-gray-800 text-center py-2 px-3 rounded-lg hover:bg-gray-300 text-sm font-medium"
-        >
-          📊 Детайли
-        </a>
-      </div>
+          {showReferredUsers && (
+            <div className="mt-3 space-y-3 max-h-64 overflow-y-auto">
+              {referredUsers.map((user, index) => (
+                <div key={index} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 bg-indigo-500/20 border border-indigo-400/30 rounded-full flex items-center justify-center">
+                        <span className="text-indigo-300 text-sm font-bold">
+                          {user.referredUser.firstName?.charAt(0)}{user.referredUser.lastName?.charAt(0)}
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-white">
+                          {user.referredUser.businessName || `${user.referredUser.firstName} ${user.referredUser.lastName}`}
+                        </h4>
+                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(user.status)}`}>
+                          {user.status === 'active' ? 'Активен' : user.status === 'pending' ? 'Чакащ' : 'Неактивен'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center p-2 bg-white/5 rounded">
+                      <div className="font-bold text-white">{user.totalClicks}</div>
+                      <div className="text-slate-400">Общо</div>
+                    </div>
+                    <div className="text-center p-2 bg-green-500/10 rounded">
+                      <div className="font-bold text-green-400">{user.validClicks}</div>
+                      <div className="text-slate-400">Валидни</div>
+                    </div>
+                    <div className="text-center p-2 bg-indigo-500/10 rounded">
+                      <div className="font-bold text-indigo-400">{user.monthlyClicks}</div>
+                      <div className="text-slate-400">Месечни</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   )
 }

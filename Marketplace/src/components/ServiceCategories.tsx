@@ -15,7 +15,7 @@ const serviceCategories = [
     id: 'plumber',
     name: 'Водопроводчик',
     description: 'ВиК услуги, канализация, отопление',
-    icon: '🔧',
+    icon: '🚰',
     gradient: 'from-blue-600 to-blue-700',
     href: '/search?category=plumber'
   },
@@ -23,7 +23,7 @@ const serviceCategories = [
     id: 'hvac',
     name: 'Климатик',
     description: 'Климатизация, вентилация, отопление',
-    icon: '❄️',
+    icon: '🌡️',
     gradient: 'from-cyan-600 to-blue-600',
     href: '/search?category=hvac'
   },
@@ -31,7 +31,7 @@ const serviceCategories = [
     id: 'handyman',
     name: 'Майстор за всичко',
     description: 'Различни ремонтни и монтажни работи',
-    icon: '🔨',
+    icon: '🛠️',
     gradient: 'from-slate-600 to-slate-700',
     href: '/search?category=handyman'
   },
@@ -39,7 +39,7 @@ const serviceCategories = [
     id: 'painter',
     name: 'Бояджия',
     description: 'Боядисване на интериор и екстериор',
-    icon: '🎨',
+    icon: '🖌️',
     gradient: 'from-indigo-600 to-purple-600',
     href: '/search?category=painter'
   },
@@ -55,7 +55,7 @@ const serviceCategories = [
     id: 'cleaner',
     name: 'Почистване',
     description: 'Професионално почистване на дом и офис',
-    icon: '🧽',
+    icon: '✨',
     gradient: 'from-teal-600 to-green-600',
     href: '/search?category=cleaner'
   },
@@ -63,7 +63,7 @@ const serviceCategories = [
     id: 'gardener',
     name: 'Градинар',
     description: 'Поддръжка на градини и озеленяване',
-    icon: '🌿',
+    icon: '🌱',
     gradient: 'from-green-600 to-emerald-600',
     href: '/search?category=gardener'
   }
@@ -71,20 +71,21 @@ const serviceCategories = [
 
 export function ServiceCategories() {
   return (
-    <section className="py-20 bg-gradient-to-b from-slate-50 to-white relative overflow-hidden">
+    <section className="py-20 relative overflow-hidden">
       {/* Industrial Background decoration */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-100/30 to-blue-50/30"></div>
-      <div className="absolute top-20 left-20 w-72 h-72 bg-blue-200/20 rounded-lg blur-3xl"></div>
-      <div className="absolute bottom-20 right-20 w-96 h-96 bg-orange-200/20 rounded-lg blur-3xl"></div>
+      <div className="absolute inset-0">
+        <div className="absolute top-20 left-20 w-72 h-72 bg-indigo-500/10 rounded-lg blur-3xl"></div>
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500/10 rounded-lg blur-3xl"></div>
+      </div>
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="bg-gradient-to-r from-slate-700 to-blue-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
               Популярни услуги
             </span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-slate-300 max-w-2xl mx-auto">
             Изберете от най-търсените професионални услуги
           </p>
         </div>
@@ -102,18 +103,18 @@ export function ServiceCategories() {
                   <div className="text-center">
                     {/* Icon with gradient background */}
                     <div className={`w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br ${category.gradient} flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                      <span className="text-3xl filter drop-shadow-sm">
+                      <span className="text-4xl filter drop-shadow-lg">
                         {category.icon}
                       </span>
                     </div>
                     
                     {/* Category name */}
-                    <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-slate-600 transition-colors duration-300">
+                    <h3 className="text-xl font-bold text-white mb-3 group-hover:text-indigo-300 transition-colors duration-300">
                       {category.name}
                     </h3>
                     
                     {/* Description */}
-                    <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                    <p className="text-slate-300 text-sm leading-relaxed mb-4">
                       {category.description}
                     </p>
                     
@@ -130,7 +131,7 @@ export function ServiceCategories() {
 
         {/* Call to action */}
         <div className="text-center mt-16">
-          <p className="text-gray-600 mb-6">
+          <p className="text-slate-300 mb-6">
             Не намирате това, което търсите?
           </p>
           <Link

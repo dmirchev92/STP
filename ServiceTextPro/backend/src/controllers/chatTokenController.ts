@@ -2,11 +2,27 @@
 // Handles token validation, generation, and lifecycle management
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { ChatTokenService } from '../services/ChatTokenService';
+import rateLimit from 'express-rate-limit';
 import { authenticateToken } from '../middleware/auth';
+import { ChatTokenService } from '../services/ChatTokenService';
 import logger from '../utils/logger';
 import { APIResponse, ServiceTextProError } from '../types';
 import config from '../utils/config';
+
+// Rate limiting for token generation (prevent abuse)
+const tokenRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Max 5 token generations per 15 minutes per IP
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many token generation attempts. Please try again later.'
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 const router = Router();
 const chatTokenService = new ChatTokenService();
@@ -191,6 +207,7 @@ router.get('/tokens/current',
  * Force generate a new token (invalidates current unused token)
  */
 router.post('/tokens/regenerate',
+  tokenRateLimit,
   authenticateToken,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

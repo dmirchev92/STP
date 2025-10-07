@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Frontend Auto-Validation</title>
+</head>
+<body>
+    <h1>Testing Frontend Auto-Validation</h1>
+    <div id="output"></div>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            console.log(message);
+            output.innerHTML += '<p>' + message + '</p>';
+        }
+        
+        async function testAutoValidation() {
+            const spIdentifier = 'NoT_';
+            const token = '9X1RL81J'; // Current unused token
+            
+            log('🧪 Testing auto-validation logic...');
+            log('SP Identifier: ' + spIdentifier);
+            log('Token: ' + token);
+            
+            try {
+                // Simulate the frontend auto-validation call
+                log('📡 Making validation request...');
+                
+                const response = await fetch(`http://192.168.0.129:3000/api/v1/chat/public/${spIdentifier}/validate/${token}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log('Response Status: ' + response.status);
+                
+                const result = await response.json();
+                log('Response: ' + JSON.stringify(result, null, 2));
+                
+                if (result.success) {
+                    log('✅ Auto-validation would work from frontend!');
+                    log('🔄 Token should be consumed and new one generated');
+                    
+                    // Store session like the real frontend would
+                    const sessionKey = `chat_session_${spIdentifier}`;
+                    if (result.data.sessionId) {
+                        localStorage.setItem(sessionKey, result.data.sessionId);
+                        log('💾 Session stored: ' + result.data.sessionId);
+                    }
+                } else {
+                    log('❌ Auto-validation failed: ' + result.error?.message);
+                }
+                
+            } catch (error) {
+                log('❌ Network error: ' + error.message);
+            }
+        }
+        
+        // Run test when page loads
+        window.onload = testAutoValidation;
+    </script>
+</body>
+</html>

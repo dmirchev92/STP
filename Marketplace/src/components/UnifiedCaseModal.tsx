@@ -31,11 +31,32 @@ export default function UnifiedCaseModal({
   const [screenshots, setScreenshots] = useState<File[]>([])
   const [dragActive, setDragActive] = useState(false)
 
+  // Map provider service categories to service type values
+  const getServiceTypeFromCategory = (category: string | undefined): string => {
+    if (!category) return 'general'
+    
+    const categoryMap: { [key: string]: string } = {
+      'electrician': 'electrician',
+      'plumber': 'plumber', 
+      'hvac': 'hvac',
+      'carpenter': 'carpenter',
+      'painter': 'painter',
+      'locksmith': 'locksmith',
+      'cleaner': 'cleaner',
+      'gardener': 'gardener',
+      'handyman': 'handyman',
+      'appliance_repair': 'handyman', // Map appliance repair to handyman
+      'general': 'general'
+    }
+    
+    return categoryMap[category.toLowerCase()] || 'general'
+  }
+
   // Initialize form data based on mode
   useEffect(() => {
     if (mode === 'direct') {
       setFormData({
-        serviceType: providerCategory || 'general',
+        serviceType: getServiceTypeFromCategory(providerCategory),
         description: '',
         preferredDate: '',
         preferredTime: 'morning',
@@ -132,16 +153,16 @@ export default function UnifiedCaseModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/20">
         {/* Header */}
-        <div className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-t-xl flex justify-between items-center">
           <h3 className="text-lg font-semibold">
             {mode === 'template' ? 'Попълни формата' : 'Създай заявка за услуга'}
           </h3>
           <button
             onClick={onClose}
-            className="text-blue-200 hover:text-white"
+            className="text-white/80 hover:text-white transition-colors"
             disabled={isSubmitting}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,17 +177,17 @@ export default function UnifiedCaseModal({
             // Template Mode - Dynamic form based on template
             <>
               <div className="mb-4">
-                <h4 className="text-lg font-medium text-gray-900 mb-2">
+                <h4 className="text-lg font-medium text-white mb-2">
                   {templateData.title || 'Информация за услугата'}
                 </h4>
                 {templateData.description && (
-                  <p className="text-gray-600 text-sm mb-4">{templateData.description}</p>
+                  <p className="text-slate-300 text-sm mb-4">{templateData.description}</p>
                 )}
               </div>
 
               {templateData.fields.map((field: any) => (
                 <div key={field.id} className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-slate-200">
                     {field.label}
                     {field.required && <span className="text-red-500 ml-1">*</span>}
                   </label>
@@ -178,7 +199,7 @@ export default function UnifiedCaseModal({
                       onChange={(e) => handleInputChange(field.id, e.target.value)}
                       placeholder={field.placeholder}
                       required={field.required}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                     />
                   )}
                   
@@ -189,7 +210,7 @@ export default function UnifiedCaseModal({
                       placeholder={field.placeholder}
                       required={field.required}
                       rows={3}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                     />
                   )}
                   
@@ -198,7 +219,7 @@ export default function UnifiedCaseModal({
                       value={formData[field.id] || ''}
                       onChange={(e) => handleInputChange(field.id, e.target.value)}
                       required={field.required}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                     >
                       <option value="">Изберете...</option>
                       {field.options?.map((option: any) => (
@@ -218,7 +239,7 @@ export default function UnifiedCaseModal({
                       required={field.required}
                       min={field.min}
                       max={field.max}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                     />
                   )}
                   
@@ -232,24 +253,57 @@ export default function UnifiedCaseModal({
             // Direct Mode - Standard case creation form
             <>
               <div className="mb-4">
-                <h4 className="text-lg font-medium text-gray-900 mb-2">
+                <h4 className="text-lg font-medium text-white mb-2">
                   Заявка за {providerName}
                 </h4>
-                <p className="text-gray-600 text-sm">
+                <p className="text-slate-300 text-sm">
                   Попълнете информацията за услугата, която търсите
                 </p>
               </div>
 
+              {/* Assignment Type */}
+              {providerId && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-200 mb-2">
+                    Тип заявка
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center text-white cursor-pointer">
+                      <input
+                        type="radio"
+                        name="assignmentType"
+                        value="specific"
+                        checked={formData.assignmentType === 'specific'}
+                        onChange={(e) => handleInputChange('assignmentType', e.target.value)}
+                        className="mr-2"
+                      />
+                      <span>Директно към {providerName}</span>
+                    </label>
+                    <label className="flex items-center text-white cursor-pointer">
+                      <input
+                        type="radio"
+                        name="assignmentType"
+                        value="open"
+                        checked={formData.assignmentType === 'open'}
+                        onChange={(e) => handleInputChange('assignmentType', e.target.value)}
+                        className="mr-2"
+                      />
+                      <span>Отворена заявка за всички специалисти</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               {/* Service Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Тип услуга <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.serviceType || ''}
                   onChange={(e) => handleInputChange('serviceType', e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="electrician">Електротехник</option>
                   <option value="plumber">Водопроводчик</option>
@@ -266,7 +320,7 @@ export default function UnifiedCaseModal({
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Описание на проблема <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -275,14 +329,14 @@ export default function UnifiedCaseModal({
                   placeholder="Опишете подробно какво трябва да се направи..."
                   required
                   rows={3}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                 />
               </div>
 
               {/* Date and Time */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-200 mb-2">
                     Предпочитана дата <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -291,17 +345,17 @@ export default function UnifiedCaseModal({
                     onChange={(e) => handleInputChange('preferredDate', e.target.value)}
                     required
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-200 mb-2">
                     Предпочитано време
                   </label>
                   <select
                     value={formData.preferredTime || 'morning'}
                     onChange={(e) => handleInputChange('preferredTime', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="morning">Сутрин (8:00-12:00)</option>
                     <option value="afternoon">Следобед (12:00-17:00)</option>
@@ -313,13 +367,13 @@ export default function UnifiedCaseModal({
 
               {/* Priority */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Приоритет
                 </label>
                 <select
                   value={formData.priority || 'normal'}
                   onChange={(e) => handleInputChange('priority', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="low">Нисък</option>
                   <option value="normal">Нормален</option>
@@ -329,7 +383,7 @@ export default function UnifiedCaseModal({
 
               {/* Address */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Адрес <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -338,13 +392,13 @@ export default function UnifiedCaseModal({
                   onChange={(e) => handleInputChange('address', e.target.value)}
                   placeholder="Въведете адреса, където да се извърши услугата"
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                 />
               </div>
 
               {/* Phone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Телефон за контакт <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -353,13 +407,13 @@ export default function UnifiedCaseModal({
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   placeholder="Въведете телефонен номер"
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                 />
               </div>
 
               {/* Screenshots Upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Снимки (опционално)
                 </label>
                 <div
@@ -380,12 +434,12 @@ export default function UnifiedCaseModal({
                     id="screenshot-upload"
                   />
                   <label htmlFor="screenshot-upload" className="cursor-pointer">
-                    <div className="text-gray-600">
+                    <div className="text-slate-300">
                       <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                       <p>Кликнете или плъзнете снимки тук</p>
-                      <p className="text-xs text-gray-500">Максимум 5 снимки, до 5MB всяка</p>
+                      <p className="text-xs text-slate-400">Максимум 5 снимки, до 5MB всяка</p>
                     </div>
                   </label>
                 </div>
@@ -415,7 +469,7 @@ export default function UnifiedCaseModal({
 
               {/* Additional Details */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Допълнителни детайли
                 </label>
                 <textarea
@@ -423,42 +477,10 @@ export default function UnifiedCaseModal({
                   onChange={(e) => handleInputChange('additionalDetails', e.target.value)}
                   placeholder="Допълнителна информация, специални изисквания..."
                   rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
                 />
               </div>
 
-              {/* Assignment Type */}
-              {providerId && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Тип заявка
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="assignmentType"
-                        value="specific"
-                        checked={formData.assignmentType === 'specific'}
-                        onChange={(e) => handleInputChange('assignmentType', e.target.value)}
-                        className="mr-2"
-                      />
-                      <span>Директно към {providerName}</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="assignmentType"
-                        value="open"
-                        checked={formData.assignmentType === 'open'}
-                        onChange={(e) => handleInputChange('assignmentType', e.target.value)}
-                        className="mr-2"
-                      />
-                      <span>Отворена заявка за всички специалисти</span>
-                    </label>
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -468,14 +490,13 @@ export default function UnifiedCaseModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+              className="px-6 py-2 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
             >
               Отказ
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-2"
             >
               {isSubmitting ? (
                 <>

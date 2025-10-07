@@ -1,0 +1,59 @@
+{
+  "name": "servicetextpro-workspace",
+  "version": "1.0.0",
+  "description": "ServiceText Pro - Complete Bulgarian Service Provider Platform",
+  "private": true,
+  "_workspaces_disabled": [
+    "ServiceTextPro",
+    "Marketplace",
+    "backend"
+  ],
+  "scripts": {
+    "dev:mobile": "cd ServiceTextPro && npm run start",
+    "dev:website": "cd Marketplace && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:website\" \"npm run dev:mobile\"",
+    "build:mobile": "cd ServiceTextPro && npm run build",
+    "build:website": "cd Marketplace && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "build:all": "npm run build:backend && npm run build:website && npm run build:mobile",
+    "install:all": "npm install && cd ServiceTextPro && npm install && cd ../Marketplace && npm install && cd ../backend && npm install",
+    "test:all": "npm run test:backend && npm run test:website && npm run test:mobile",
+    "test:backend": "cd backend && npm test",
+    "test:website": "cd Marketplace && npm test",
+    "test:mobile": "cd ServiceTextPro && npm test",
+    "lint:all": "npm run lint:backend && npm run lint:website && npm run lint:mobile",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:website": "cd Marketplace && npm run lint",
+    "lint:mobile": "cd ServiceTextPro && npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "servicetextpro",
+    "bulgarian",
+    "marketplace",
+    "service-providers",
+    "mobile-app",
+    "website",
+    "backend",
+    "monorepo"
+  ],
+  "author": "ServiceText Pro Team",
+  "license": "MIT",
+  "overrides": {
+    "react": "19.1.0",
+    "@types/react": "^19.1.0"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-clipboard/clipboard": "^1.16.3",
+    "axios": "^1.11.0",
+    "sqlite3": "^5.1.7"
+  }
+}

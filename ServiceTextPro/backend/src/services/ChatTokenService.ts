@@ -213,17 +213,25 @@ export class ChatTokenService {
   }
 
   /**
-   * Generate secure random token
+   * Generate cryptographically secure random token
    */
   private generateSecureToken(): string {
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let token = '';
+    const crypto = require('crypto');
     
-    for (let i = 0; i < 8; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    // Generate 12 random bytes and convert to base36 for alphanumeric token
+    // This provides much higher entropy than Math.random()
+    const randomBytes = crypto.randomBytes(12);
+    
+    // Convert to alphanumeric string (0-9, A-Z)
+    let token = '';
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    
+    for (let i = 0; i < randomBytes.length; i++) {
+      token += chars[randomBytes[i] % chars.length];
     }
     
-    return token;
+    // Ensure exactly 12 characters for consistency
+    return token.substring(0, 12);
   }
 
   /**

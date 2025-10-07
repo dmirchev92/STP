@@ -292,6 +292,45 @@ export const getPendingReviews = async (req: Request, res: Response): Promise<vo
 };
 
 /**
+ * Update provider rating (recalculate from reviews)
+ */
+export const updateProviderRating = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { providerId } = req.params;
+
+    if (!providerId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Provider ID is required'
+        }
+      });
+      return;
+    }
+
+    await reviewService.updateProviderRating(providerId);
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Provider rating updated successfully'
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Error updating provider rating:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to update provider rating'
+      }
+    });
+  }
+};
+
+/**
  * Send review request notification
  */
 export const sendReviewRequest = async (req: Request, res: Response): Promise<void> => {

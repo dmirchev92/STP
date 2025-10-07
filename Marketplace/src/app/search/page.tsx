@@ -298,24 +298,24 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 relative overflow-hidden">
       {/* Industrial background elements */}
       <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-br from-orange-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
+        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-indigo-500/10 to-slate-500/10 rounded-lg blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-br from-purple-500/10 to-slate-500/10 rounded-lg blur-3xl"></div>
       </div>
       
       <Header />
       
       <main className="relative z-10 container mx-auto px-4 py-8">
         {/* Search Header */}
-        <div className="mb-8 bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-slate-200">
+        <div className="mb-8 bg-white/10 backdrop-blur-md rounded-xl p-6 shadow-xl border border-white/20">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-orange-500 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white text-lg">🔍</span>
               </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-700 to-blue-600 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold text-white">
                 Намерени Услуги
               </h1>
             </div>
@@ -323,30 +323,30 @@ export default function SearchPage() {
             {/* Real-time status indicator */}
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${isSocketConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-slate-300">
                 {isSocketConnected ? 'Актуални данни' : 'Без връзка'}
               </span>
               {realTimeUpdates > 0 && (
-                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                <span className="bg-indigo-500/20 text-indigo-300 text-xs px-2 py-1 rounded-full border border-indigo-400/30">
                   {realTimeUpdates} обновления
                 </span>
               )}
             </div>
           </div>
           
-          <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+          <div className="flex flex-wrap gap-2 text-sm">
             {category && (
-              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+              <span className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full border border-indigo-400/30">
                 📋 {getCategoryDisplayName(category)}
               </span>
             )}
             {city && (
-              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full">
+              <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full border border-green-400/30">
                 🏙️ {city}
               </span>
             )}
             {neighborhood && (
-              <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+              <span className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full border border-purple-400/30">
                 📍 {neighborhood}
               </span>
             )}
@@ -356,18 +356,18 @@ export default function SearchPage() {
         {/* Loading State */}
         {loading && (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Зареждане на услуги...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/30 mx-auto"></div>
+            <p className="mt-4 text-slate-300">Зареждане на услуги...</p>
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <p className="text-red-800">❌ {error}</p>
+          <div className="bg-red-500/10 border border-red-400/30 rounded-lg p-6 text-center backdrop-blur-sm">
+            <p className="text-red-300">❌ {error}</p>
             <button 
               onClick={() => window.location.reload()} 
-              className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+              className="mt-4 bg-red-600/80 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
             >
               Опитай отново
             </button>
@@ -377,10 +377,10 @@ export default function SearchPage() {
         {/* Results */}
         {!loading && !error && (
           <>
-            <div className="mb-6 bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-slate-200">
+            <div className="mb-6 bg-white/10 backdrop-blur-md rounded-lg p-4 border border-white/20">
               <div className="flex items-center gap-2">
-                <span className="text-blue-600">📊</span>
-                <p className="text-slate-700 font-semibold">
+                <span className="text-indigo-400">📊</span>
+                <p className="text-white font-semibold">
                   Намерени {providers.length} {providers.length === 1 ? 'услуга' : 'услуги'}
                 </p>
               </div>
@@ -389,15 +389,15 @@ export default function SearchPage() {
             {providers.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">🔍</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-xl font-semibold text-white mb-2">
                   Няма намерени услуги
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-slate-300 mb-6">
                   Опитайте с различни критерии за търсене
                 </p>
                 <a 
                   href="/" 
-                  className="bg-gradient-to-r from-blue-600 to-orange-500 text-white px-6 py-3 rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300"
                 >
                   Върни се към началото
                 </a>
@@ -405,54 +405,65 @@ export default function SearchPage() {
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {providers.map((provider) => (
-                  <div key={provider.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-slate-200">
+                  <div key={provider.id} className="bg-white/10 backdrop-blur-md rounded-xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-white/20">
                     <div className="p-6">
                       {/* Provider Header */}
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
-                              <span className="text-white text-sm font-bold">
-                                {(provider as any).firstName?.charAt(0)}{(provider as any).lastName?.charAt(0)}
-                              </span>
+                          <div className="flex items-center gap-3 mb-2">
+                            {/* Profile Picture */}
+                            {(provider as any).profileImageUrl ? (
+                              <img
+                                src={(provider as any).profileImageUrl}
+                                alt={(provider as any).businessName}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-white/30"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 border-2 border-white/30 rounded-full flex items-center justify-center">
+                                <span className="text-white text-sm font-bold">
+                                  {(provider as any).firstName?.charAt(0)}{(provider as any).lastName?.charAt(0)}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <h3 className="text-lg font-bold text-white">
+                                {(provider as any).businessName}
+                              </h3>
+                              <p className="text-sm text-slate-300 font-medium">
+                                {(provider as any).firstName} {(provider as any).lastName}
+                              </p>
                             </div>
-                            <h3 className="text-lg font-bold text-slate-800">
-                              {(provider as any).businessName}
-                            </h3>
                           </div>
-                          <p className="text-sm text-slate-600 font-medium">
-                            {(provider as any).firstName} {(provider as any).lastName}
-                          </p>
                         </div>
-                        <span className="bg-gradient-to-r from-blue-100 to-orange-100 text-slate-700 text-xs px-3 py-1 rounded-full font-semibold border border-blue-200">
+                        <span className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 text-xs px-3 py-1 rounded-full font-semibold border border-indigo-400/30">
                           {getCategoryDisplayName((provider as any).serviceCategory || (provider as any).service_category)}
                         </span>
                       </div>
 
                       {/* Rating */}
-                      <div className="flex items-center mb-4 p-2 bg-slate-50 rounded-lg">
-                        <span className="text-lg mr-2">{getStars(provider.rating)}</span>
-                        <span className="text-sm text-slate-700 font-semibold">
-                          {Number((provider as any).rating ?? 0).toFixed(1)} ({(provider as any).totalReviews ?? 0} отзива)
+                      <div className="flex items-center mb-4 p-2 bg-white/10 rounded-lg">
+                        <span className="text-lg mr-2">{getStars(provider.rating || 0)}</span>
+                        <span className="text-sm text-slate-200 font-semibold">
+                          {Number(provider.rating || 0).toFixed(1)} ({(provider as any).totalReviews || provider.total_reviews || 0} отзива)
                         </span>
                       </div>
 
                       {/* Description */}
-                      <p className="text-slate-700 text-sm mb-4 line-clamp-3 bg-slate-50 p-3 rounded-lg italic">
+                      <p className="text-slate-200 text-sm mb-4 line-clamp-3 bg-white/5 p-3 rounded-lg italic">
                         {(provider as any).description || 'Професионални услуги с качество и гаранция.'}
                       </p>
 
                       {/* Details */}
                       <div className="space-y-2 mb-4">
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className="flex items-center text-sm text-slate-300">
                           <span className="mr-2">📍</span>
                           <span>{(provider as any).city}, {(provider as any).neighborhood}</span>
                         </div>
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className="flex items-center text-sm text-slate-300">
                           <span className="mr-2">⭐</span>
                           <span>{(provider as any).experienceYears} години опит</span>
                         </div>
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className="flex items-center text-sm text-slate-300">
                           <span className="mr-2">📞</span>
                           <span>{(provider as any).phoneNumber}</span>
                         </div>
@@ -462,19 +473,19 @@ export default function SearchPage() {
                       <div className="flex gap-2">
                         <a
                           href={`/provider/${provider.id}`}
-                          className="flex-1 bg-slate-600 text-white text-center py-2 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm font-medium"
+                          className="flex-1 bg-white/20 text-white text-center py-2 px-4 rounded-md hover:bg-white/30 transition-colors text-sm font-medium border border-white/30"
                         >
                           Виж повече
                         </a>
                         <button
                           onClick={() => handleCreateCase(provider)}
-                          className="bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition-colors text-sm font-medium"
+                          className="bg-purple-600/80 text-white py-2 px-4 rounded-md hover:bg-purple-600 transition-colors text-sm font-medium"
                         >
                           Заявка
                         </button>
                         <button
                           onClick={() => handleStartChat(provider)}
-                          className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                          className="bg-indigo-600/80 text-white py-2 px-4 rounded-md hover:bg-indigo-600 transition-colors text-sm font-medium"
                         >
                           Чат
                         </button>

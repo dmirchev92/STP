@@ -63,6 +63,8 @@ CREATE INDEX IF NOT EXISTS idx_reviews_rating ON case_reviews(rating);
 -- Add rating and review columns to service_provider_profiles table if they don't exist
 ALTER TABLE service_provider_profiles ADD COLUMN response_time_hours INTEGER DEFAULT 24;
 ALTER TABLE service_provider_profiles ADD COLUMN base_price REAL DEFAULT 0.0;
+ALTER TABLE service_provider_profiles ADD COLUMN rating REAL DEFAULT 0.0;
+ALTER TABLE service_provider_profiles ADD COLUMN total_reviews INTEGER DEFAULT 0;
 
 -- Add missing columns to marketplace_service_cases if not exists
 ALTER TABLE marketplace_service_cases ADD COLUMN customer_id TEXT;

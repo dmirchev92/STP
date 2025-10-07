@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Chat URL</title>
+</head>
+<body>
+    <h1>Testing Chat URL Auto-Validation</h1>
+    <p>Current token: <strong>9X1RL81J</strong></p>
+    <p>Chat URL: <a href="http://192.168.0.129:3002/u/NoT_/c/9X1RL81J" target="_blank">http://192.168.0.129:3002/u/NoT_/c/9X1RL81J</a></p>
+    
+    <h2>Instructions:</h2>
+    <ol>
+        <li>Click the chat URL above</li>
+        <li>Open browser DevTools (F12) and check Console tab</li>
+        <li>Look for auto-validation logs</li>
+        <li>Check Network tab for API calls to /validate/</li>
+        <li>Run get-current-token.js to see if new token was generated</li>
+    </ol>
+    
+    <h2>Expected Behavior:</h2>
+    <ul>
+        <li>Page should auto-validate token on load (useEffect)</li>
+        <li>Console should show "No existing session, auto-validating token"</li>
+        <li>Network tab should show GET request to /api/v1/chat/public/NoT_/validate/9X1RL81J</li>
+        <li>Token 9X1RL81J should be marked as used</li>
+        <li>New token should be generated</li>
+        <li>Chat should start automatically</li>
+    </ul>
+    
+    <h2>Debug Steps:</h2>
+    <ol>
+        <li>If no console logs appear → Frontend code not updated</li>
+        <li>If no network requests → useEffect not running</li>
+        <li>If welcome screen shows → Auto-validation disabled</li>
+        <li>If validation fails → Check token/backend</li>
+    </ol>
+    
+    <script>
+        // Test the token validation endpoint directly
+        async function testTokenValidation() {
+            const spIdentifier = 'NoT_';
+            const token = '9X1RL81J'; // Current unused token
+            
+            console.log('Testing token validation...');
+            console.log('SP Identifier:', spIdentifier);
+            console.log('Token:', token);
+            
+            try {
+                const response = await fetch(`http://192.168.0.129:3000/api/v1/chat/public/${spIdentifier}/validate/${token}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                console.log('Response:', result);
+                
+                if (result.success) {
+                    document.body.innerHTML += '<p style="color: green;">✅ Token validation successful!</p>';
+                    document.body.innerHTML += '<p>User ID: ' + result.data.userId + '</p>';
+                    document.body.innerHTML += '<p>Conversation ID: ' + result.data.conversationId + '</p>';
+                    document.body.innerHTML += '<p>Session ID: ' + result.data.sessionId + '</p>';
+                } else {
+                    document.body.innerHTML += '<p style="color: red;">❌ Token validation failed: ' + result.error.message + '</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.body.innerHTML += '<p style="color: red;">❌ Network error: ' + error.message + '</p>';
+            }
+        }
+        
+        // Run test when page loads
+        window.onload = testTokenValidation;
+    </script>
+</body>
+</html>
