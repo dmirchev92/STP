@@ -19,6 +19,8 @@ import { AuthBus } from './src/utils/AuthBus';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthScreen } from './src/screens/AuthScreen';
 import ApiService from './src/services/ApiService';
+import SocketIOService from './src/services/SocketIOService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface User {
   id: string;
@@ -48,21 +50,70 @@ function AppContent() {
 
   useEffect(() => {
     checkExistingSession();
+    
+    // Initialize call detection service immediately (doesn't need auth)
+    const initCallDetection = async () => {
+      try {
+        const { ModernCallDetectionService } = await import('./src/services/ModernCallDetectionService');
+        ModernCallDetectionService.getInstance();
+        console.log('📱 App.tsx - Call detection service initialized on app start');
+      } catch (error) {
+        console.error('❌ App.tsx - Error initializing call detection:', error);
+      }
+    };
+    initCallDetection();
+    
     const unsubscribe = AuthBus.subscribe('logout', () => {
       setCurrentUser(null);
+      // Disconnect Socket.IO on logout
+      SocketIOService.getInstance().disconnect();
     });
     return () => unsubscribe();
   }, []);
 
+  // Initialize Socket.IO when user is authenticated
+  useEffect(() => {
+    console.log('🔍 App.tsx - currentUser changed:', currentUser?.id);
+    if (currentUser) {
+      console.log('✅ App.tsx - User authenticated, initializing Socket.IO');
+      initializeSocketIO();
+    } else {
+      console.log('⚠️ App.tsx - No user, skipping Socket.IO');
+    }
+  }, [currentUser]);
+
+  const initializeSocketIO = async () => {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        console.log('⚠️ App.tsx - No auth token for Socket.IO');
+        return;
+      }
+
+      console.log('🔌 App.tsx - Initializing Socket.IO connection...');
+      await SocketIOService.getInstance().connect(token);
+      console.log('✅ App.tsx - Socket.IO initialized globally');
+      
+      // Also initialize call detection service (auto-initializes on getInstance)
+      const { ModernCallDetectionService } = await import('./src/services/ModernCallDetectionService');
+      ModernCallDetectionService.getInstance();
+      console.log('✅ App.tsx - Call detection service loaded');
+    } catch (error) {
+      console.error('❌ App.tsx - Error initializing services:', error);
+    }
+  };
+
   const checkExistingSession = async () => {
     try {
       const isAuthenticated = ApiService.getInstance().isAuthenticated();
-      console.log('App.tsx - isAuthenticated:', isAuthenticated);
+      console.log('🔐 App.tsx - isAuthenticated:', isAuthenticated);
       
       if (isAuthenticated) {
         // Fast-path: render app immediately when token exists
-        console.log('App.tsx - Token present, rendering app immediately and verifying user in background');
-        setCurrentUser({ id: 'local', email: '', firstName: '', lastName: '', role: 'tradesperson' });
+        console.log('🔐 App.tsx - Token present, rendering app immediately and verifying user in background');
+        const localUser = { id: 'local', email: '', firstName: '', lastName: '', role: 'tradesperson' };
+        console.log('🔐 App.tsx - Setting currentUser to:', localUser);
+        setCurrentUser(localUser);
 
         // Verify in background without blocking UI
         ApiService.getInstance().getCurrentUser()

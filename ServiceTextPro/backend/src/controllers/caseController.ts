@@ -19,6 +19,8 @@ export const createCase = async (req: Request, res: Response): Promise<void> => 
       preferredDate,
       preferredTime,
       priority,
+      city,
+      neighborhood,
       address,
       phone,
       additionalDetails,
@@ -32,12 +34,12 @@ export const createCase = async (req: Request, res: Response): Promise<void> => 
     } = req.body;
 
     // Validate required fields
-    if (!serviceType || !description || !address || !phone) {
+    if (!serviceType || !description || !phone || !city) {
       res.status(400).json({
         success: false,
         error: {
           code: 'BAD_REQUEST',
-          message: 'Missing required fields: serviceType, description, address, phone'
+          message: 'Missing required fields: serviceType, description, phone, city'
         }
       });
       return;
@@ -51,10 +53,10 @@ export const createCase = async (req: Request, res: Response): Promise<void> => 
       db.db.run(
         `INSERT INTO marketplace_service_cases (
           id, service_type, description, preferred_date, preferred_time,
-          priority, address, phone, additional_details, provider_id,
+          priority, city, neighborhood, phone, additional_details, provider_id,
           provider_name, is_open_case, assignment_type, status,
           customer_id, category, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           caseId,
           serviceType,
@@ -62,7 +64,8 @@ export const createCase = async (req: Request, res: Response): Promise<void> => 
           preferredDate,
           preferredTime || 'morning',
           priority || 'normal',
-          address,
+          city,
+          neighborhood,
           phone,
           additionalDetails,
           assignmentType === 'specific' ? providerId : null,
@@ -88,11 +91,17 @@ export const createCase = async (req: Request, res: Response): Promise<void> => 
     // Handle screenshots if provided
     if (screenshots && screenshots.length > 0) {
       for (const screenshot of screenshots) {
+        // Skip screenshots without a valid URL
+        const imageUrl = screenshot.url || screenshot.name || screenshot;
+        if (!imageUrl || typeof imageUrl !== 'string') {
+          continue;
+        }
+
         const screenshotId = uuidv4();
         await new Promise<void>((resolve, reject) => {
           db.db.run(
             `INSERT INTO case_screenshots (id, case_id, image_url, created_at) VALUES (?, ?, ?, ?)`,
-            [screenshotId, caseId, screenshot.url || screenshot.name, now],
+            [screenshotId, caseId, imageUrl, now],
             function(err) {
               if (err) {
                 reject(err);
@@ -102,6 +111,23 @@ export const createCase = async (req: Request, res: Response): Promise<void> => 
             }
           );
         });
+      }
+    }
+
+    // Send notification to SP if case is directly assigned to them
+    if (assignmentType === 'specific' && providerId) {
+      logger.info('🔔 Creating notification for directly assigned SP', { providerId, caseId });
+      try {
+        await notificationService.createNotification(
+          providerId,
+          'case_assigned',
+          'Нова заявка директно възложена',
+          `Клиент ви възложи нова заявка: ${description.substring(0, 50)}...`,
+          { caseId, action: 'view_case' }
+        );
+        logger.info('✅ Notification sent to SP for direct assignment', { providerId, caseId });
+      } catch (notifError) {
+        logger.error('❌ Error sending notification to SP:', notifError);
       }
     }
 
@@ -229,7 +255,7 @@ export const acceptCase = async (req: Request, res: Response): Promise<void> => 
       );
     });
 
-    // Send notification to customer
+    // Send notification to customer that their case was accepted
     if (caseDetails?.customer_id) {
       await notificationService.notifyCaseAssigned(
         caseId,
@@ -261,12 +287,12 @@ export const acceptCase = async (req: Request, res: Response): Promise<void> => 
 };
 
 /**
- * Decline a case
+ * Decline a case - tracks provider-specific declines
  */
 export const declineCase = async (req: Request, res: Response): Promise<void> => {
   try {
     const { caseId } = req.params;
-    const { reason } = req.body;
+    const { reason, providerId } = req.body;
 
     if (!caseId) {
       res.status(400).json({
@@ -279,14 +305,75 @@ export const declineCase = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const now = new Date().toISOString();
+    // Get provider ID from authenticated user if not provided
+    const actualProviderId = providerId || (req as any).user?.id;
 
+    if (!actualProviderId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Provider ID is required'
+        }
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const declineId = require('uuid').v4();
+
+    // Check if this provider already declined this case
+    const existingDecline = await new Promise<any>((resolve, reject) => {
+      db.db.get(
+        'SELECT * FROM case_declines WHERE case_id = ? AND provider_id = ?',
+        [caseId, actualProviderId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (existingDecline) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'ALREADY_DECLINED',
+          message: 'You have already declined this case'
+        }
+      });
+      return;
+    }
+
+    // Get the case details
+    const caseDetails = await new Promise<any>((resolve, reject) => {
+      db.db.get(
+        'SELECT * FROM marketplace_service_cases WHERE id = ?',
+        [caseId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (!caseDetails) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'CASE_NOT_FOUND',
+          message: 'Case not found'
+        }
+      });
+      return;
+    }
+
+    // Record the decline for this specific provider
     await new Promise<void>((resolve, reject) => {
       db.db.run(
-        `UPDATE marketplace_service_cases 
-         SET status = 'declined', decline_reason = ?, updated_at = ?
-         WHERE id = ?`,
-        [reason, now, caseId],
+        `INSERT INTO case_declines (id, case_id, provider_id, reason, declined_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [declineId, caseId, actualProviderId, reason, now],
         function(err) {
           if (err) {
             reject(err);
@@ -297,12 +384,33 @@ export const declineCase = async (req: Request, res: Response): Promise<void> =>
       );
     });
 
-    logger.info('✅ Case declined successfully', { caseId, reason });
+    // If case was assigned to this provider, unassign it and return to queue
+    if (caseDetails.provider_id === actualProviderId) {
+      await new Promise<void>((resolve, reject) => {
+        db.db.run(
+          `UPDATE marketplace_service_cases 
+           SET provider_id = NULL, status = 'pending', updated_at = ?
+           WHERE id = ?`,
+          [now, caseId],
+          function(err) {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          }
+        );
+      });
+      logger.info('✅ Case unassigned and returned to queue', { caseId, providerId: actualProviderId });
+    }
+
+    logger.info('✅ Case declined by provider', { caseId, providerId: actualProviderId, reason });
 
     res.json({
       success: true,
       data: {
-        message: 'Case declined successfully'
+        message: 'Case declined successfully',
+        returnedToQueue: caseDetails.provider_id === actualProviderId
       }
     });
 
@@ -319,7 +427,105 @@ export const declineCase = async (req: Request, res: Response): Promise<void> =>
 };
 
 /**
+ * Un-decline a case (remove from declined list so provider can see it again)
+ */
+export const undeclineCase = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { caseId } = req.params;
+    const { providerId } = req.body;
+
+    if (!caseId || !providerId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Case ID and Provider ID are required'
+        }
+      });
+      return;
+    }
+
+    // Remove the decline record
+    await new Promise<void>((resolve, reject) => {
+      db.db.run(
+        'DELETE FROM case_declines WHERE case_id = ? AND provider_id = ?',
+        [caseId, providerId],
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    logger.info('✅ Case un-declined', { caseId, providerId });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Case un-declined successfully'
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Error un-declining case:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to un-decline case'
+      }
+    });
+  }
+};
+
+/**
+ * Get declined cases for a provider
+ */
+export const getDeclinedCases = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { providerId } = req.params;
+
+    const cases = await new Promise<any[]>((resolve, reject) => {
+      db.db.all(
+        `SELECT c.*, cd.declined_at, cd.reason as decline_reason
+         FROM marketplace_service_cases c
+         INNER JOIN case_declines cd ON c.id = cd.case_id
+         WHERE cd.provider_id = ?
+         ORDER BY cd.declined_at DESC`,
+        [providerId],
+        (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows || []);
+          }
+        }
+      );
+    });
+
+    res.json({
+      success: true,
+      data: cases
+    });
+
+  } catch (error) {
+    logger.error('❌ Error fetching declined cases:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch declined cases'
+      }
+    });
+  }
+};
+
+/**
  * Get available cases for a provider (open cases)
+ * Excludes cases that this provider has already declined
  */
 export const getAvailableCases = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -327,11 +533,16 @@ export const getAvailableCases = async (req: Request, res: Response): Promise<vo
 
     const cases = await new Promise<any[]>((resolve, reject) => {
       db.db.all(
-        `SELECT * FROM marketplace_service_cases 
-         WHERE (is_open_case = 1 AND status = 'pending') 
-            OR (provider_id = ? AND status != 'closed')
-         ORDER BY created_at DESC`,
-        [providerId],
+        `SELECT c.* FROM marketplace_service_cases c
+         WHERE (
+           (c.is_open_case = 1 AND c.status = 'pending') 
+           OR (c.provider_id = ? AND c.status != 'closed')
+         )
+         AND c.id NOT IN (
+           SELECT case_id FROM case_declines WHERE provider_id = ?
+         )
+         ORDER BY c.created_at DESC`,
+        [providerId, providerId],
         (err, rows) => {
           if (err) {
             reject(err);
@@ -445,11 +656,23 @@ export const completeCase = async (req: Request, res: Response): Promise<void> =
 
     // Send notification to customer and request review
     if (caseDetails?.customer_id && caseDetails?.provider_id) {
-      await notificationService.notifyCaseCompleted(
-        caseId,
-        caseDetails.customer_id,
-        caseDetails.provider_id
-      );
+      logger.info('🔔 Sending completion notification to customer', { 
+        caseId, 
+        customerId: caseDetails.customer_id, 
+        providerId: caseDetails.provider_id 
+      });
+      try {
+        await notificationService.notifyCaseCompleted(
+          caseId,
+          caseDetails.customer_id,
+          caseDetails.provider_id
+        );
+        logger.info('✅ Completion notification sent successfully');
+      } catch (notifError) {
+        logger.error('❌ Error sending completion notification:', notifError);
+      }
+    } else {
+      logger.warn('⚠️ Cannot send notification - missing customer or provider ID', { caseDetails });
     }
 
     logger.info('✅ Case completed successfully', { caseId, incomeRecorded: !!income });
@@ -541,11 +764,14 @@ export const getCasesWithFilters = async (req: Request, res: Response): Promise<
   try {
     const { 
       status, 
-      category, 
+      category,
+      city,
+      neighborhood,
       providerId, 
       customerId, 
       createdByUserId,
       onlyUnassigned,
+      excludeDeclinedBy,
       page = 1, 
       limit = 10,
       sortBy = 'created_at',
@@ -568,12 +794,23 @@ export const getCasesWithFilters = async (req: Request, res: Response): Promise<
       params.push(category);
     }
 
+    if (city) {
+      conditions.push('c.city = ?');
+      params.push(city);
+    }
+
+    if (neighborhood) {
+      conditions.push('c.neighborhood = ?');
+      params.push(neighborhood);
+    }
+
     // Handle user-specific filtering
     if (createdByUserId) {
       if (onlyUnassigned === 'true') {
-        // Show only unassigned cases created by this user
+        // Show only unassigned cases, excluding ones this provider has declined
         conditions.push('c.customer_id = ? AND c.provider_id IS NULL');
-        params.push(createdByUserId);
+        conditions.push(`c.id NOT IN (SELECT case_id FROM case_declines WHERE provider_id = ?)`);
+        params.push(createdByUserId, createdByUserId);
       } else {
         // Show cases where user is either customer, provider, or created the case
         conditions.push('(c.customer_id = ? OR c.provider_id = ?)');
@@ -584,12 +821,25 @@ export const getCasesWithFilters = async (req: Request, res: Response): Promise<
       if (providerId) {
         conditions.push('c.provider_id = ?');
         params.push(providerId);
+        
+        // If filtering by providerId and showing unassigned, exclude declined cases
+        if (onlyUnassigned === 'true') {
+          conditions.push(`c.id NOT IN (SELECT case_id FROM case_declines WHERE provider_id = ?)`);
+          params.push(providerId);
+        }
       }
 
       if (customerId) {
         conditions.push('c.customer_id = ?');
         params.push(customerId);
       }
+    }
+
+    // Exclude cases declined by a specific provider (for available cases view)
+    if (excludeDeclinedBy) {
+      conditions.push(`c.id NOT IN (SELECT case_id FROM case_declines WHERE provider_id = ?)`);
+      params.push(excludeDeclinedBy);
+      console.log('🚫 Backend - Excluding cases declined by provider:', excludeDeclinedBy);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -711,13 +961,31 @@ export const getCaseStats = async (req: Request, res: Response): Promise<void> =
       );
     });
 
-    // Get available cases count (unassigned cases for service providers)
+    // Get available cases count (unassigned cases for service providers, excluding declined)
     let availableCount = 0;
     if (providerId) {
       availableCount = await new Promise<number>((resolve, reject) => {
         db.db.get(
-          `SELECT COUNT(*) as count FROM marketplace_service_cases WHERE provider_id IS NULL AND status = 'pending'`,
-          [],
+          `SELECT COUNT(*) as count FROM marketplace_service_cases 
+           WHERE provider_id IS NULL 
+           AND status = 'pending'
+           AND id NOT IN (SELECT case_id FROM case_declines WHERE provider_id = ?)`,
+          [providerId],
+          (err, row: any) => {
+            if (err) reject(err);
+            else resolve(row?.count || 0);
+          }
+        );
+      });
+    }
+
+    // Get declined cases count for this provider
+    let declinedCount = 0;
+    if (providerId) {
+      declinedCount = await new Promise<number>((resolve, reject) => {
+        db.db.get(
+          `SELECT COUNT(*) as count FROM case_declines WHERE provider_id = ?`,
+          [providerId],
           (err, row: any) => {
             if (err) reject(err);
             else resolve(row?.count || 0);
@@ -748,7 +1016,7 @@ export const getCaseStats = async (req: Request, res: Response): Promise<void> =
       accepted: 0,
       wip: 0,
       completed: 0,
-      declined: 0
+      declined: declinedCount // Use the count from case_declines table
     };
 
     statusStats.forEach((stat: any) => {
@@ -756,7 +1024,6 @@ export const getCaseStats = async (req: Request, res: Response): Promise<void> =
       else if (stat.status === 'accepted') stats.accepted = stat.count;
       else if (stat.status === 'wip') stats.wip = stat.count;
       else if (stat.status === 'completed') stats.completed = stat.count;
-      else if (stat.status === 'declined') stats.declined = stat.count;
     });
 
     res.json({
@@ -1216,6 +1483,59 @@ export const updateIncomeTransaction = async (req: Request, res: Response): Prom
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to update income transaction'
+      }
+    });
+  }
+};
+
+/**
+ * Get available years with income data for a provider
+ */
+export const getIncomeYears = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { providerId } = req.params;
+
+    if (!providerId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Provider ID is required'
+        }
+      });
+      return;
+    }
+
+    const years = await new Promise<any[]>((resolve, reject) => {
+      db.db.all(
+        `SELECT DISTINCT strftime('%Y', recorded_at) as year
+         FROM case_income 
+         WHERE provider_id = ? AND recorded_at IS NOT NULL
+         ORDER BY year ASC`,
+        [providerId],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    const yearList = years.map(row => parseInt(row.year)).filter(year => !isNaN(year));
+
+    logger.info('✅ Income years retrieved', { providerId, years: yearList });
+
+    res.json({
+      success: true,
+      data: yearList
+    });
+
+  } catch (error) {
+    logger.error('❌ Error fetching income years:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch income years'
       }
     });
   }

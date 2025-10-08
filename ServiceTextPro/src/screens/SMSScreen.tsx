@@ -246,6 +246,22 @@ function SMSScreen() {
       const newFiltering = !currentFiltering;
       console.log('New filtering state:', newFiltering);
       
+      // If enabling filtering, request contacts permission
+      if (newFiltering) {
+        const { ContactService } = await import('../services/ContactService');
+        const contactService = ContactService.getInstance();
+        const hasPermission = await contactService.requestContactsPermission();
+        
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Required',
+            'Contact filtering requires access to your contacts. Please grant the permission to continue.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       // Update the SMS service config directly
       await smsService.updateConfig({ filterKnownContacts: newFiltering });
       
@@ -256,11 +272,16 @@ function SMSScreen() {
           [{ text: 'OK' }]
         );
       } else {
-        Alert.alert('Contact Filtering Disabled', 'SMS will be sent to all missed calls, including known contacts.');
+        Alert.alert(
+          'Contact Filtering Disabled',
+          'SMS will be sent to all missed calls, including contacts.',
+          [{ text: 'OK' }]
+        );
       }
       
-      // Reload data to update the UI
-      await loadSMSData();
+      // Update local state
+      setSmsStats(prev => ({ ...prev, filterKnownContacts: newFiltering }));
+      
     } catch (error) {
       console.error('Error toggling contact filtering:', error);
       Alert.alert('Error', 'Failed to toggle contact filtering');
@@ -271,6 +292,25 @@ function SMSScreen() {
     if (!timestamp) return 'Never';
     const date = new Date(timestamp);
     return date.toLocaleString('bg-BG');
+  };
+
+  const testMissedCallDetection = async () => {
+    try {
+      const { ModernCallDetectionService } = await import('../services/ModernCallDetectionService');
+      const callService = ModernCallDetectionService.getInstance();
+      
+      // Use safe test method that only checks filtering without sending SMS
+      const result = await callService.testContactFiltering();
+      
+      Alert.alert(
+        'Test Complete', 
+        'Check the console logs for contact filtering results. No SMS was sent.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', `Test failed: ${error}`);
+      console.error('Test error:', error);
+    }
   };
 
   return (
@@ -325,6 +365,14 @@ function SMSScreen() {
           <Text style={styles.statusValue}>{smsStats.processedCalls}</Text>
         </View>
       </View>
+
+      {/* Test Button */}
+      <TouchableOpacity 
+        style={styles.testButton}
+        onPress={testMissedCallDetection}
+      >
+        <Text style={styles.testButtonText}>🧪 Test Missed Call Detection</Text>
+      </TouchableOpacity>
 
       {/* Toggle Switch */}
       <View style={styles.toggleCard}>
@@ -520,6 +568,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#2E7D32',
     padding: 20,
     paddingTop: 40,
+  },
+  testButton: {
+    backgroundColor: '#FF9800',
+    margin: 16,
+    marginTop: 0,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   title: {
     color: 'white',

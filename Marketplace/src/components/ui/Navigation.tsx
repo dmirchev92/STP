@@ -86,13 +86,19 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                   className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
                 >
-                  <Avatar
-                    name={`${user.firstName} ${user.lastName}`}
-                    src={user.avatar}
-                    size="sm"
-                    status="online"
-                    showStatus
-                  />
+                  <div className="relative">
+                    <Avatar
+                      name={`${user.firstName} ${user.lastName}`}
+                      src={user.avatar}
+                      size="sm"
+                      status="online"
+                      showStatus
+                    />
+                    {/* Red dot indicator for unread notifications */}
+                    {unreadCount > 0 && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-slate-900 rounded-full animate-pulse"></div>
+                    )}
+                  </div>
                   <div className="hidden sm:block text-left">
                     <p className="text-sm font-medium text-white">
                       {user.firstName} {user.lastName}
@@ -167,20 +173,28 @@ const Navigation: React.FC<NavigationProps> = ({ user, unreadCount = 0, onLogout
               </div>
             ) : (
               <div className="flex items-center space-x-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push('/login')}
-                >
-                  Вход
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => router.push('/register')}
-                >
-                  Регистрация
-                </Button>
+                <Link href="/auth/login">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      console.log('🔘 Вход button clicked');
+                    }}
+                  >
+                    Вход
+                  </Button>
+                </Link>
+                <Link href="/auth/register">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      console.log('🔘 Регистрация button clicked');
+                    }}
+                  >
+                    Регистрация
+                  </Button>
+                </Link>
               </div>
             )}
 

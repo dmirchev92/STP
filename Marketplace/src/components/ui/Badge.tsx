@@ -109,8 +109,8 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md', classNam
     },
     pending: {
       variant: 'info' as const,
-      icon: '🆕',
-      label: 'Нова'
+      icon: '⏳',
+      label: 'Чакаща'
     },
     accepted: {
       variant: 'success' as const,

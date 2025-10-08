@@ -35,6 +35,7 @@ const serviceCategories = [
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<RegistrationData>({
     email: '',
@@ -49,6 +50,16 @@ export default function RegisterPage() {
     neighborhood: '',
     acceptTerms: false
   })
+
+  // Check URL parameter for account type preselection
+  useEffect(() => {
+    const type = searchParams.get('type')
+    if (type === 'provider' || type === 'service_provider') {
+      setFormData(prev => ({ ...prev, userType: 'service_provider' }))
+    } else if (type === 'customer') {
+      setFormData(prev => ({ ...prev, userType: 'customer' }))
+    }
+  }, [searchParams])
 
   const handleInputChange = (field: keyof RegistrationData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -150,18 +161,19 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Industrial background elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-br from-orange-200/20 to-slate-200/20 rounded-lg blur-3xl"></div>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-lg blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-500/10 to-slate-500/10 rounded-lg blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-slate-500/5 to-indigo-500/5 rounded-full blur-3xl"></div>
       </div>
       
       <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-between items-center mb-4">
           <button
             onClick={() => router.back()}
-            className="flex items-center text-slate-600 hover:text-slate-800 transition-colors"
+            className="flex items-center text-slate-300 hover:text-white transition-colors"
           >
             <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -170,27 +182,27 @@ export default function RegisterPage() {
           </button>
         </div>
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-xl bg-gradient-to-r from-blue-600 to-orange-500 flex items-center justify-center shadow-lg">
+          <div className="w-16 h-16 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/50">
             <span className="text-3xl">🔧</span>
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
           Създайте акаунт
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-slate-300">
           Или{' '}
-          <Link href="/auth/login" className="font-medium text-blue-600 hover:text-blue-800 transition-colors">
+          <Link href="/auth/login" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
             влезте в съществуващ акаунт
           </Link>
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-20">
+        <div className="bg-slate-800/50 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl py-8 px-4 sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* User Type Selection */}
             <div>
-              <label className="text-base font-medium text-gray-900">
+              <label className="text-base font-medium text-slate-200">
                 Тип акаунт
               </label>
               <div className="mt-4 space-y-4">
@@ -201,9 +213,9 @@ export default function RegisterPage() {
                     type="radio"
                     checked={formData.userType === 'customer'}
                     onChange={() => handleInputChange('userType', 'customer')}
-                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"
+                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-slate-600 bg-slate-700"
                   />
-                  <label htmlFor="customer" className="ml-3 block text-sm font-medium text-gray-700">
+                  <label htmlFor="customer" className="ml-3 block text-sm font-medium text-slate-300">
                     Клиент - търся услуги
                   </label>
                 </div>
@@ -214,9 +226,9 @@ export default function RegisterPage() {
                     type="radio"
                     checked={formData.userType === 'service_provider'}
                     onChange={() => handleInputChange('userType', 'service_provider')}
-                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"
+                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-slate-600 bg-slate-700"
                   />
-                  <label htmlFor="service_provider" className="ml-3 block text-sm font-medium text-gray-700">
+                  <label htmlFor="service_provider" className="ml-3 block text-sm font-medium text-slate-300">
                     Доставчик на услуги - предлагам услуги
                   </label>
                 </div>
@@ -226,7 +238,7 @@ export default function RegisterPage() {
             {/* Personal Information */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="firstName" className="block text-sm font-medium text-slate-200">
                   Име *
                 </label>
                 <input
@@ -236,12 +248,12 @@ export default function RegisterPage() {
                   required
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white placeholder-slate-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   placeholder="Иван"
                 />
               </div>
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="lastName" className="block text-sm font-medium text-slate-200">
                   Фамилия *
                 </label>
                 <input
@@ -251,14 +263,14 @@ export default function RegisterPage() {
                   required
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white placeholder-slate-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   placeholder="Петров"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-200">
                 Имейл адрес *
               </label>
               <input
@@ -269,13 +281,13 @@ export default function RegisterPage() {
                 required
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white placeholder-slate-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="ivan@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="phoneNumber" className="block text-sm font-medium text-slate-200">
                 Телефон *
               </label>
               <input
@@ -285,7 +297,7 @@ export default function RegisterPage() {
                 required
                 value={formData.phoneNumber}
                 onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white placeholder-slate-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="+359xxxxxxxxx"
               />
             </div>
@@ -294,7 +306,7 @@ export default function RegisterPage() {
             {formData.userType === 'service_provider' && (
               <>
                 <div>
-                  <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="companyName" className="block text-sm font-medium text-slate-200">
                     Име на компанията *
                   </label>
                   <input
@@ -304,13 +316,13 @@ export default function RegisterPage() {
                     required
                     value={formData.companyName}
                     onChange={(e) => handleInputChange('companyName', e.target.value)}
-                    className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                    className="mt-1 appearance-none relative block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white placeholder-slate-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                     placeholder="Вашата компания ООД"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="serviceCategory" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="serviceCategory" className="block text-sm font-medium text-slate-200">
                     Категория услуги *
                   </label>
                   <select
@@ -319,7 +331,7 @@ export default function RegisterPage() {
                     required
                     value={formData.serviceCategory}
                     onChange={(e) => handleInputChange('serviceCategory', e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   >
                     <option value="">Изберете категория</option>
                     {serviceCategories.map((category) => (
@@ -334,7 +346,7 @@ export default function RegisterPage() {
 
             {/* Neighborhood field for all users */}
             <div>
-              <label htmlFor="neighborhood" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="neighborhood" className="block text-sm font-medium text-slate-200">
                 Квартал в София
               </label>
               <select
@@ -342,7 +354,7 @@ export default function RegisterPage() {
                 name="neighborhood"
                 value={formData.neighborhood}
                 onChange={(e) => handleInputChange('neighborhood', e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">Изберете квартал</option>
                 <option value="7-и – 11-и километър">7-и – 11-и километър</option>
@@ -496,7 +508,7 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-200">
                 Парола *
               </label>
               <input
@@ -507,16 +519,16 @@ export default function RegisterPage() {
                 required
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white placeholder-slate-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="••••••••"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-400">
                 Поне 8 символа, главна буква, малка буква, цифра и специален символ
               </p>
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-200">
                 Потвърдете паролата *
               </label>
               <input
@@ -527,7 +539,7 @@ export default function RegisterPage() {
                 required
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 bg-slate-700/50 border border-white/10 text-white placeholder-slate-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -539,11 +551,11 @@ export default function RegisterPage() {
                 type="checkbox"
                 checked={formData.acceptTerms}
                 onChange={(e) => handleInputChange('acceptTerms', e.target.checked)}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-600 rounded bg-slate-700"
               />
-              <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="acceptTerms" className="ml-2 block text-sm text-slate-300">
                 Съгласявам се с{' '}
-                <a href="#" className="text-indigo-600 hover:text-indigo-500">
+                <a href="#" className="text-indigo-400 hover:text-indigo-300">
                   условията за ползване
                 </a>
               </label>
@@ -553,7 +565,7 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-indigo-500/50"
               >
                 {loading ? 'Създаване...' : 'Създайте акаунт'}
               </button>

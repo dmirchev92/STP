@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { sofiaNeighborhoods } from './NeighborhoodSelect'
 
 interface UnifiedCaseModalProps {
   isOpen: boolean
@@ -55,13 +56,17 @@ export default function UnifiedCaseModal({
   // Initialize form data based on mode
   useEffect(() => {
     if (mode === 'direct') {
+      // Get today's date in YYYY-MM-DD format for the date input
+      const today = new Date().toISOString().split('T')[0];
+      
       setFormData({
         serviceType: getServiceTypeFromCategory(providerCategory),
         description: '',
-        preferredDate: '',
+        preferredDate: today, // Pre-fill with today's date
         preferredTime: 'morning',
         priority: 'normal',
-        address: '',
+        city: '',
+        neighborhood: '',
         phone: customerPhone || '',
         additionalDetails: '',
         assignmentType: providerId ? 'specific' : 'open'
@@ -135,8 +140,13 @@ export default function UnifiedCaseModal({
     
     if (mode === 'direct') {
       // Validate required fields for direct mode
-      if (!formData.description || !formData.preferredDate || !formData.address || !formData.phone) {
+      if (!formData.description || !formData.preferredDate || !formData.phone || !formData.city) {
         alert('Моля, попълнете всички задължителни полета')
+        return
+      }
+      // Neighborhood required only when city is Sofia
+      if (formData.city === 'София' && !formData.neighborhood) {
+        alert('Моля, изберете квартал за град София')
         return
       }
       
@@ -318,6 +328,52 @@ export default function UnifiedCaseModal({
                 </select>
               </div>
 
+              {/* Location: City */}
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Град <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.city || ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    // Update city and reset neighborhood when city changes
+                    handleInputChange('city', val)
+                    handleInputChange('neighborhood', '')
+                  }}
+                  required
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Изберете град</option>
+                  <option value="София">София</option>
+                  <option value="Пловдив">Пловдив</option>
+                  <option value="Варна">Варна</option>
+                  <option value="Бургас">Бургас</option>
+                </select>
+              </div>
+
+              {/* Neighborhood (only for Sofia) */}
+              {formData.city === 'София' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-2">
+                    Квартал <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.neighborhood || ''}
+                    onChange={(e) => handleInputChange('neighborhood', e.target.value)}
+                    required={formData.city === 'София'}
+                    className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Изберете квартал</option>
+                    {sofiaNeighborhoods.map((neighborhood) => (
+                      <option key={neighborhood} value={neighborhood}>
+                        {neighborhood}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-slate-200 mb-2">
@@ -379,21 +435,6 @@ export default function UnifiedCaseModal({
                   <option value="normal">Нормален</option>
                   <option value="urgent">Спешен</option>
                 </select>
-              </div>
-
-              {/* Address */}
-              <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">
-                  Адрес <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.address || ''}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  placeholder="Въведете адреса, където да се извърши услугата"
-                  required
-                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
-                />
               </div>
 
               {/* Phone */}

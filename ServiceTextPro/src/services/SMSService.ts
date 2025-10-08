@@ -21,7 +21,7 @@ interface SMSPermissions {
 export class SMSService {
   private static instance: SMSService;
   private config: SMSConfig = {
-    isEnabled: false,
+    isEnabled: false, // SMS OFF by default - users must explicitly enable
     message: 'Zaet sum, shte vurna obajdane sled nqkolko minuti.\n\nZapochnete chat tuk:\n[chat_link]\n\n', // Template with [chat_link] placeholder
     sentCount: 0,
     sentCallIds: [],
@@ -43,10 +43,29 @@ export class SMSService {
 
   private async loadConfig(): Promise<void> {
     try {
+      // Try to load from API first (synchronized with web app)
+      const userId = await this.getCurrentUserIdAsync();
+      
+      if (userId) {
+        try {
+          const apiConfig = await this.loadConfigFromAPI(userId);
+          if (apiConfig) {
+            this.config = { ...this.config, ...apiConfig };
+            console.log('📱 SMS config loaded from API (synchronized):', this.config);
+            // Cache to AsyncStorage for offline access
+            await AsyncStorage.setItem('sms_config', JSON.stringify(this.config));
+            return;
+          }
+        } catch (apiError) {
+          console.warn('⚠️ Could not load from API, falling back to local storage:', apiError);
+        }
+      }
+      
+      // Fallback to AsyncStorage (offline mode or not authenticated)
       const savedConfig = await AsyncStorage.getItem('sms_config');
       if (savedConfig) {
         this.config = { ...this.config, ...JSON.parse(savedConfig) };
-        console.log('📱 SMS config loaded:', this.config);
+        console.log('📱 SMS config loaded from local storage:', this.config);
       }
       
       // Initialize user chat links storage if needed
@@ -114,10 +133,101 @@ export class SMSService {
 
   private async saveConfig(): Promise<void> {
     try {
+      // Save to AsyncStorage first (immediate local backup)
       await AsyncStorage.setItem('sms_config', JSON.stringify(this.config));
-      console.log('💾 SMS config saved:', this.config);
+      console.log('💾 SMS config saved locally:', this.config);
+      
+      // Try to sync to API (synchronized with web app)
+      const userId = await this.getCurrentUserIdAsync();
+      if (userId) {
+        try {
+          await this.saveConfigToAPI(userId);
+          console.log('☁️ SMS config synced to server');
+        } catch (apiError) {
+          console.warn('⚠️ Could not sync to API (will retry later):', apiError);
+        }
+      }
     } catch (error) {
       console.error('❌ Error saving SMS config:', error);
+    }
+  }
+
+  /**
+   * Load SMS config from API (synchronized with web app)
+   */
+  private async loadConfigFromAPI(userId: string): Promise<Partial<SMSConfig> | null> {
+    try {
+      const authToken = await this.getAuthToken();
+      if (!authToken) {
+        console.log('⚠️ No auth token, cannot load from API');
+        return null;
+      }
+
+      const response = await fetch('http://192.168.0.129:3000/api/v1/sms/config', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const result: any = await response.json();
+        if (result.success && result.data?.config) {
+          const apiConfig = result.data.config;
+          return {
+            isEnabled: apiConfig.isEnabled,
+            message: apiConfig.message,
+            sentCount: apiConfig.sentCount,
+            lastSentTime: apiConfig.lastSentTime,
+            filterKnownContacts: apiConfig.filterKnownContacts,
+            sentCallIds: [] // This is managed locally for now
+          };
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Error loading config from API:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Save SMS config to API (synchronized with web app)
+   */
+  private async saveConfigToAPI(userId: string): Promise<void> {
+    try {
+      const authToken = await this.getAuthToken();
+      if (!authToken) {
+        console.log('⚠️ No auth token, cannot save to API');
+        return;
+      }
+
+      const response = await fetch('http://192.168.0.129:3000/api/v1/sms/config', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          isEnabled: this.config.isEnabled,
+          message: this.config.message,
+          filterKnownContacts: this.config.filterKnownContacts
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+
+      const result: any = await response.json();
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to save config');
+      }
+    } catch (error) {
+      console.error('❌ Error saving config to API:', error);
+      throw error;
     }
   }
 
@@ -231,7 +341,7 @@ export class SMSService {
     try {
       const authToken = await this.getAuthToken();
       if (!authToken) {
-        console.error('❌ No auth token available');
+        // Silent: SMS feature uses device tokens, not auth tokens
         return null;
       }
 
@@ -764,18 +874,20 @@ export class SMSService {
 
     // Check if we should filter known contacts
     if (this.config.filterKnownContacts) {
-      console.log(`📱 Contact filtering is enabled, checking contacts...`);
+      console.log(`📱 Contact filtering is ENABLED, checking contacts...`);
       const contactService = ContactService.getInstance();
       const contactInfo = await contactService.isPhoneNumberInContacts(phoneNumber);
       
+      console.log(`📱 Contact check result:`, contactInfo);
+      
       if (contactInfo.isInContacts) {
-        console.log(`📱 Phone number ${phoneNumber} is in contacts (${contactInfo.contactName || 'Unknown'}), skipping SMS`);
+        console.log(`🚫 BLOCKING SMS: Phone number ${phoneNumber} is in contacts (${contactInfo.contactName || 'Unknown'})`);
         return false;
       } else {
-        console.log(`📱 Phone number ${phoneNumber} is not in contacts, proceeding with SMS`);
+        console.log(`✅ ALLOWING SMS: Phone number ${phoneNumber} is NOT in contacts`);
       }
     } else {
-      console.log(`📱 Contact filtering is disabled, proceeding with SMS`);
+      console.log(`📱 Contact filtering is DISABLED, proceeding with SMS`);
     }
 
     // Get the actual user ID for this SMS

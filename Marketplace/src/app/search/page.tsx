@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Header } from '@/components/Header'
 import ChatModal from '@/components/ChatModal'
@@ -9,6 +9,7 @@ import UnifiedCaseModal from '@/components/UnifiedCaseModal'
 import ChatWidget from '@/components/ChatWidget'
 import { Footer } from '@/components/Footer'
 import { apiClient } from '@/lib/api'
+import { sofiaNeighborhoods } from '@/components/NeighborhoodSelect'
 
 interface ServiceProvider {
   id: string
@@ -29,6 +30,7 @@ interface ServiceProvider {
 
 export default function SearchPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { user } = useAuth()
   const [providers, setProviders] = useState<ServiceProvider[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,6 +46,22 @@ export default function SearchPage() {
   const category = searchParams.get('category')
   const city = searchParams.get('city')
   const neighborhood = searchParams.get('neighborhood')
+
+  // Local filter state
+  const [filters, setFilters] = useState({
+    category: category || '',
+    city: city || '',
+    neighborhood: neighborhood || ''
+  })
+
+  // Update local filters when URL params change
+  useEffect(() => {
+    setFilters({
+      category: category || '',
+      city: city || '',
+      neighborhood: neighborhood || ''
+    })
+  }, [category, city, neighborhood])
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -297,6 +315,38 @@ export default function SearchPage() {
     }
   }
 
+  const handleFilterChange = (newFilters: typeof filters) => {
+    setFilters(newFilters)
+    
+    // Update URL with new filters
+    const params = new URLSearchParams()
+    if (newFilters.category) params.append('category', newFilters.category)
+    if (newFilters.city) params.append('city', newFilters.city)
+    if (newFilters.neighborhood) params.append('neighborhood', newFilters.neighborhood)
+    
+    router.push(`/search?${params.toString()}`)
+  }
+
+  const serviceTypes = [
+    { value: 'electrician', label: 'Електротехник' },
+    { value: 'plumber', label: 'Водопроводчик' },
+    { value: 'hvac', label: 'Климатик' },
+    { value: 'carpenter', label: 'Дърводелец' },
+    { value: 'painter', label: 'Бояджия' },
+    { value: 'locksmith', label: 'Ключар' },
+    { value: 'cleaner', label: 'Почистване' },
+    { value: 'gardener', label: 'Градинар' },
+    { value: 'handyman', label: 'Майстор за всичко' },
+    { value: 'appliance_repair', label: 'Ремонт на уреди' },
+  ]
+
+  const cities = [
+    { value: 'София', label: 'София' },
+    { value: 'Пловдив', label: 'Пловдив' },
+    { value: 'Варна', label: 'Варна' },
+    { value: 'Бургас', label: 'Бургас' },
+  ]
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 relative overflow-hidden">
       {/* Industrial background elements */}
@@ -349,6 +399,71 @@ export default function SearchPage() {
               <span className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full border border-purple-400/30">
                 📍 {neighborhood}
               </span>
+            )}
+          </div>
+        </div>
+
+        {/* Search Filters */}
+        <div className="mb-8 bg-white/10 backdrop-blur-md rounded-xl p-6 shadow-xl border border-white/20">
+          <h2 className="text-xl font-semibold text-white mb-4">Филтри за търсене</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Service Type Filter */}
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Тип услуга
+              </label>
+              <select
+                value={filters.category}
+                onChange={(e) => handleFilterChange({ ...filters, category: e.target.value })}
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Всички услуги</option>
+                {serviceTypes.map((service) => (
+                  <option key={service.value} value={service.value}>
+                    {service.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* City Filter */}
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Град
+              </label>
+              <select
+                value={filters.city}
+                onChange={(e) => handleFilterChange({ ...filters, city: e.target.value, neighborhood: '' })}
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Изберете град</option>
+                {cities.map((city) => (
+                  <option key={city.value} value={city.value}>
+                    {city.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Neighborhood Filter (only for Sofia) */}
+            {filters.city === 'София' && (
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  Квартал
+                </label>
+                <select
+                  value={filters.neighborhood}
+                  onChange={(e) => handleFilterChange({ ...filters, neighborhood: e.target.value })}
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Всички квартали</option>
+                  {sofiaNeighborhoods.map((neighborhood) => (
+                    <option key={neighborhood} value={neighborhood}>
+                      {neighborhood}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </div>

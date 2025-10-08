@@ -321,7 +321,7 @@ export class NotificationService {
       // Get case details for more specific notification
       const caseDetails = await new Promise<any>((resolve, reject) => {
         this.db.db.get(
-          `SELECT c.*, p.first_name, p.last_name, p.business_name
+          `SELECT c.*, p.first_name, p.last_name
            FROM marketplace_service_cases c
            LEFT JOIN users p ON c.provider_id = p.id
            WHERE c.id = ?`,
@@ -346,7 +346,7 @@ export class NotificationService {
       }
 
       // Create more specific notification with case details
-      const providerName = caseDetails.business_name || `${caseDetails.first_name} ${caseDetails.last_name}`;
+      const providerName = caseDetails.provider_name || `${caseDetails.first_name || ''} ${caseDetails.last_name || ''}`.trim() || 'Изпълнителя';
       const caseDescription = caseDetails.description || caseDetails.service_type || 'услугата';
       
       console.log('🔔 NotificationService - Creating notification...');

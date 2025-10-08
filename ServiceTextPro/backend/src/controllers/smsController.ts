@@ -4,12 +4,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { ChatTokenService } from '../services/ChatTokenService';
+import { SQLiteDatabase } from '../models/SQLiteDatabase';
 import logger from '../utils/logger';
 import { APIResponse, ServiceTextProError } from '../types';
 import config from '../utils/config';
 
 const router = Router();
 const chatTokenService = new ChatTokenService();
+const db = new SQLiteDatabase();
 
 /**
  * GET /api/v1/sms/config
@@ -41,20 +43,21 @@ router.get('/config',
         
         // Create preview message with actual link
         const defaultMessage = 'Зает съм, ще върна обаждане след няколко минути.\n\nЗапочнете чат тук:\n[chat_link]\n\n';
-        previewMessage = defaultMessage.replace('[chat_link]', currentChatUrl || 'Генериране на връзка...');
       } catch (error) {
         logger.warn('Could not get current chat URL for SMS preview', { userId, error });
         previewMessage = 'Зает съм, ще върна обаждане след няколко минути.\n\nЗапочнете чат тук:\nГенериране на връзка...\n\n';
       }
 
-      // Default SMS configuration (in real app, this would come from database)
+      // Get SMS configuration from database
+      const smsSettings = await db.getSMSSettings(userId);
+      
       const smsConfig = {
-        isEnabled: true, // This would be stored per user
-        message: 'Зает съм, ще върна обаждане след няколко минути.\n\nЗапочнете чат тук:\n[chat_link]\n\n',
-        sentCount: stats.totalCount,
-        lastSentTime: Date.now(), // This would come from last SMS record
-        filterKnownContacts: true, // This would be stored per user
-        processedCalls: stats.totalCount // Approximation
+        isEnabled: smsSettings?.isEnabled || false,
+        message: smsSettings?.message || '',
+        sentCount: smsSettings?.sentCount || 0,
+        lastSentTime: smsSettings?.lastSentTime || null,
+        filterKnownContacts: smsSettings?.filterKnownContacts || false,
+        processedCalls: smsSettings?.sentCallIds?.length || 0
       };
 
       const response: APIResponse = {
@@ -96,9 +99,7 @@ router.put('/config',
 
       const { isEnabled, message, filterKnownContacts } = req.body;
 
-      // In a real implementation, you would save these settings to database
-      // For now, we'll just validate and return success
-      
+      // Validate message if provided
       if (message && typeof message === 'string') {
         if (message.length > 500) {
           throw new ServiceTextProError('Message too long (max 500 characters)', 'MESSAGE_TOO_LONG', 400);
@@ -109,7 +110,15 @@ router.put('/config',
         }
       }
 
-      logger.info('SMS config updated', {
+      // Save settings to database
+      const updates: any = {};
+      if (isEnabled !== undefined) updates.isEnabled = isEnabled;
+      if (message !== undefined) updates.message = message;
+      if (filterKnownContacts !== undefined) updates.filterKnownContacts = filterKnownContacts;
+
+      await db.updateSMSSettings(userId, updates);
+
+      logger.info('SMS config updated in database', {
         userId,
         updates: { isEnabled, messageLength: message?.length, filterKnownContacts }
       });
@@ -148,10 +157,10 @@ router.delete('/history/clear',
         throw new ServiceTextProError('Authentication required', 'AUTHENTICATION_REQUIRED', 401);
       }
 
-      // In a real implementation, you would clear the SMS history from database
-      // This could involve clearing processed call IDs, SMS activity logs, etc.
+      // Clear SMS history from database
+      await db.clearSMSHistory(userId);
       
-      logger.info('SMS history cleared', { userId });
+      logger.info('SMS history cleared from database', { userId });
 
       const response: APIResponse = {
         success: true,

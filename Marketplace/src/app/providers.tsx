@@ -2,14 +2,16 @@
 
 import { Provider } from 'react-redux'
 import { store } from '@/store'
-// import { SocketProvider } from '@/lib/socket'
+import { SocketProvider } from '@/contexts/SocketContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <Provider store={store}>
       <AuthProvider>
-        {children}
+        <SocketProvider>
+          {children}
+        </SocketProvider>
       </AuthProvider>
     </Provider>
   )

@@ -212,9 +212,9 @@ export const getProvider = async (req: Request, res: Response): Promise<void> =>
  */
 export const searchProviders = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { city, category, limit = 50, offset = 0 } = req.query;
+    const { city, neighborhood, category, limit = 50, offset = 0 } = req.query;
 
-    logger.info('🔍 Searching providers with filters:', { city, category, limit, offset });
+    logger.info('🔍 Searching providers with filters:', { city, neighborhood, category, limit, offset });
 
     let query = `
       SELECT 
@@ -234,6 +234,11 @@ export const searchProviders = async (req: Request, res: Response): Promise<void
     if (city) {
       query += ' AND spp.city = ?';
       params.push(city);
+    }
+
+    if (neighborhood) {
+      query += ' AND spp.neighborhood = ?';
+      params.push(neighborhood);
     }
 
     if (category) {
@@ -280,7 +285,7 @@ export const searchProviders = async (req: Request, res: Response): Promise<void
 
     logger.info('✅ Provider search completed', { 
       resultsCount: transformedProviders.length,
-      filters: { city, category }
+      filters: { city, neighborhood, category }
     });
 
     res.json({

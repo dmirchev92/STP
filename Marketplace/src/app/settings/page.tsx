@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/Header'
 import apiClient from '@/lib/api'
+import { sofiaNeighborhoods } from '@/components/NeighborhoodSelect'
 
 interface ProfileData {
   firstName: string
@@ -58,26 +59,15 @@ export default function SettingsPage() {
     confirmPassword: ''
   })
 
-  // Cities and neighborhoods data (same as SearchSection)
-  const cities = [
-    'София', 'Пловдив', 'Варна', 'Бургас', 'Русе', 'Стара Загора',
-    'Плевен', 'Добрич', 'Сливен', 'Шумен', 'Перник', 'Хасково',
-    'Ямбол', 'Пазарджик', 'Благоевград', 'Велико Търново', 'Враца', 'Габрово'
-  ]
-
-  const sofiaNeighborhoods = [
-    'Център', 'Лозенец', 'Младост', 'Люлин', 'Студентски град',
-    'Надежда', 'Красно село', 'Овча купел', 'Дружба', 'Гео Милев',
-    'Изток', 'Западен парк', 'Витоша', 'Бояна', 'Драгалевци',
-    'Симеоново', 'Борово', 'Манастирски ливади', 'Хладилника', 'Редута'
-  ]
+  // Cities data (same as case filters and search)
+  const cities = ['София', 'Пловдив', 'Варна', 'Бургас']
 
   // Get neighborhoods based on selected city
   const getNeighborhoods = () => {
     if (profileData.city === 'София') {
       return sofiaNeighborhoods
     }
-    return [] // Add more cities' neighborhoods as needed
+    return [] // Only Sofia has neighborhoods for now
   }
 
   useEffect(() => {

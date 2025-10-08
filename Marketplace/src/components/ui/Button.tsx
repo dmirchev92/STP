@@ -48,8 +48,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         shadow-sm hover:shadow-lg backdrop-blur-sm
       `,
       ghost: `
-        bg-transparent text-slate-400 border border-transparent
-        hover:bg-white/5 hover:text-slate-200
+        bg-transparent text-slate-200 border border-transparent
+        hover:bg-white/10 hover:text-white
       `,
       construction: `
         bg-indigo-600/80 text-white

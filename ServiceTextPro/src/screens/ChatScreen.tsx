@@ -1,467 +1,249 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   RefreshControl,
-  AppState,
+  SafeAreaView,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MainTabParamList } from '../navigation/types';
-import { RootState } from '../store';
-// Removed import - using simple local state instead
-import ApiService from '../services/ApiService';
-import WebSocketService from '../services/WebSocketService';
-import { CallRecord } from '../utils/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SocketIOService from '../services/SocketIOService';
+import ApiService from '../services/ApiService';
+import { Conversation } from '../types/chat';
 import theme from '../styles/theme';
-
-interface ChatMessageType {
-  id: string;
-  text: string;
-  sender: 'customer' | 'ai' | 'ivan';
-  timestamp: string;
-  isTyping?: boolean;
-  isRead?: boolean;
-  metadata?: {
-    platform: 'viber' | 'whatsapp' | 'telegram';
-    messageId?: string;
-    deliveryStatus?: 'sent' | 'delivered' | 'read' | 'failed';
-  };
-}
-
-interface Conversation {
-  id: string;
-  customerPhone: string;
-  customerName?: string;
-  status: 'ai_active' | 'ivan_taken_over' | 'closed' | 'handoff_requested';
-  messages: ChatMessageType[];
-  lastActivity: string;
-  lastMessage?: string;
-  callRecord?: CallRecord;
-  aiConfidence?: number;
-  urgency?: 'low' | 'medium' | 'high' | 'emergency';
-}
 
 type ChatScreenNavigationProp = StackNavigationProp<MainTabParamList, 'Chat'>;
 
 function ChatScreen() {
   const navigation = useNavigation<ChatScreenNavigationProp>();
-  const dispatch = useDispatch();
-  const { currentMode } = useSelector((state: RootState) => state.app);
-  const { calls } = useSelector((state: RootState) => state.calls);
-  
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string>('');
 
-  const pollIntervalRef = useRef<any>(null);
-  const appState = useRef(AppState.currentState);
-  const webSocketService = useRef(WebSocketService.getInstance());
+  // Socket.IO is now initialized globally in App.tsx
+  // No need to initialize here anymore
 
-  // Start polling
-  const startPolling = () => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-    }
-    console.log('🔄 Starting conversation polling every 5 minutes');
-    pollIntervalRef.current = setInterval(() => {
-      console.log('🔄 Auto-refreshing conversations...');
-      loadConversations(true); // Silent refresh - no loading spinner
-    }, 300000); // Refresh every 5 minutes (300000ms)
-  };
-
-  // Stop polling
-  const stopPolling = () => {
-    if (pollIntervalRef.current) {
-      console.log('⏸️ Stopping conversation polling');
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  };
-
-  // Handle app state changes
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        console.log('📱 App has come to the foreground - refreshing conversations');
-        loadConversations(true); // Silent refresh
-        startPolling();
-      } else if (nextAppState.match(/inactive|background/)) {
-        console.log('📱 App has gone to background - stopping polling');
-        stopPolling();
-      }
-
-      appState.current = nextAppState;
-    });
-
-    return () => subscription?.remove();
-  }, []);
-
-  // Setup WebSocket listeners
-  useEffect(() => {
-    const ws = webSocketService.current;
-    
-    // Connect to WebSocket
-    ws.connect();
-    
-    // Setup authentication when connected
-    ws.on('connected', async () => {
-      try {
-        const apiService = ApiService.getInstance();
-        const userResponse = await apiService.getCurrentUser();
-        
-        if (userResponse.success && userResponse.data) {
-          const currentUser = (userResponse.data as any)?.user || userResponse.data;
-          const token = await AsyncStorage.getItem('auth_token');
-          
-          if (token && currentUser?.id) {
-            ws.authenticate(token, currentUser.id);
-            ws.joinUserRoom(currentUser.id);
-          }
-        }
-      } catch (error) {
-        console.error('Error setting up WebSocket authentication:', error);
-      }
-    });
-
-    // Listen for new message notifications
-    ws.on('new_message_notification', (data: any) => {
-      console.log('📱 New message notification received:', data);
-      // Refresh conversations to show new message
-      loadConversations(true);
-    });
-
-    // Listen for new messages in conversations
-    ws.on('new_message', (data: any) => {
-      console.log('📱 New message in conversation:', data);
-      // Update specific conversation with new message
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === data.conversationId) {
-          return {
-            ...conv,
-            lastMessage: data.message,
-            lastActivity: data.timestamp,
-            messages: [...(conv.messages || []), {
-              id: data.messageId,
-              text: data.message,
-              sender: data.senderType as 'customer' | 'ai' | 'ivan',
-              timestamp: data.timestamp
-            }]
-          };
-        }
-        return conv;
-      }));
-    });
-
-    return () => {
-      ws.off('connected', () => {});
-      ws.off('new_message_notification', () => {});
-      ws.off('new_message', () => {});
-    };
-  }, []);
-
-  // Screen focus effect
+  // Load conversations when screen is focused
   useFocusEffect(
     React.useCallback(() => {
-      console.log('📱 Chat screen focused - refreshing conversations');
-      loadConversations(true); // Silent refresh
-      startPolling();
-
-      return () => {
-        console.log('📱 Chat screen unfocused - stopping polling');
-        stopPolling();
-      };
+      loadConversations();
     }, [])
   );
 
-  // Initial load
-  useEffect(() => {
-    loadConversations();
-  }, []);
 
   const loadConversations = async (silent = false) => {
     try {
-      if (!silent) {
-        setIsLoading(true);
-      }
-      
-      // Get current user to load their conversations
-      const apiService = ApiService.getInstance();
-      const userResponse = await apiService.getCurrentUser();
+      if (!silent) setIsLoading(true);
 
-      let targetUserId: string | null = null;
-      if (userResponse.success && userResponse.data) {
-        const currentUser = (userResponse.data as any)?.user || userResponse.data; // Handle both formats
-        targetUserId = currentUser?.id || null;
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        console.log('⚠️ No auth token');
+        setIsLoading(false);
+        return;
       }
 
-      if (!targetUserId) {
-        // Fallback: use device-based user id so backend can map it to the real user
-        const deviceUserId = await AsyncStorage.getItem('device_user_id');
-        if (deviceUserId) {
-          console.log('📱 No auth user, using device ID to load conversations:', deviceUserId);
-          targetUserId = deviceUserId;
-        } else {
-          console.log('📱 No current user or device ID, skipping conversation load');
-          setConversations([]);
-          return;
+      // Get current user
+      const userResponse = await ApiService.getInstance().getCurrentUser();
+      const userData: any = userResponse.data?.user || userResponse.data;
+
+      // Load conversations from API
+      const response = await fetch(
+        `http://192.168.0.129:3000/api/v1/chat/user/${userData.id}/conversations`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
         }
-      }
+      );
 
-      console.log('📱 Loading conversations for user:', targetUserId);
-      const response = await apiService.getConversations(targetUserId);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📱 ChatScreen - API response:', data);
+        
+        // Conversations are in data.data.conversations
+        const conversationsList = data.data?.conversations || [];
+        console.log(`✅ Loaded ${conversationsList.length} conversations`);
+        
+        // Debug: Log first conversation to see structure
+        if (conversationsList.length > 0) {
+          console.log('📱 ChatScreen - First conversation:', conversationsList[0]);
+        }
+        
+        setConversations(conversationsList);
 
-      if (response.success && response.data) {
-        console.log('✅ Loaded conversations:', response.data.conversations.length);
-        console.log('📋 Conversation details:');
-        response.data.conversations.forEach((conv: any, index: number) => {
-          console.log(`  ${index + 1}. ID: ${conv.id}, Customer: ${conv.customerName || conv.customerPhone}, Type: ${conv.conversationType}, Status: ${conv.status}, Last Message: "${conv.lastMessage || 'None'}"`);
-        });
-        setConversations(response.data.conversations);
+        // Save to AsyncStorage
+        await AsyncStorage.setItem('conversations', JSON.stringify(conversationsList));
       } else {
-        console.error('❌ Failed to load conversations:', response.error);
-        setConversations([]);
+        console.error('❌ Failed to load conversations:', response.status);
       }
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      console.error('❌ Error loading conversations:', error);
+      
+      // Try to load from cache
+      const cached = await AsyncStorage.getItem('conversations');
+      if (cached) {
+        setConversations(JSON.parse(cached));
+      }
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  const onRefresh = async () => {
+  const updateConversationInList = (updatedConversation: Conversation) => {
+    setConversations(prev => {
+      const index = prev.findIndex(c => c.id === updatedConversation.id);
+      if (index >= 0) {
+        // Update existing
+        const newList = [...prev];
+        newList[index] = updatedConversation;
+        return newList;
+      } else {
+        // Add new
+        return [updatedConversation, ...prev];
+      }
+    });
+  };
+
+  const handleConversationPress = (conversation: Conversation) => {
+    navigation.navigate('ChatDetail', {
+      conversationId: conversation.id,
+      providerId: conversation.providerId,
+      providerName: conversation.customerName || 'Customer',
+    });
+  };
+
+  const handleRefresh = () => {
     setIsRefreshing(true);
-    await loadConversations();
-    setIsRefreshing(false);
+    loadConversations(true);
   };
 
-  const handleConversationSelect = (conversation: Conversation) => {
-    navigation.navigate('ChatDetail', { conversation });
-  };
-
-
-
-  const renderConversationItem = ({ item }: { item: Conversation }) => (
-    <TouchableOpacity
-      style={[
-        styles.conversationItem,
-        item.status === 'closed' && styles.closedConversation,
-      ]}
-      onPress={() => handleConversationSelect(item)}
-    >
-      <View style={styles.conversationHeader}>
-        <Text style={styles.customerName}>
-          {item.customerName || item.customerPhone}
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>
-            {getStatusLabel(item.status)}
-          </Text>
-        </View>
-      </View>
-      
-      <Text style={styles.lastMessage} numberOfLines={2}>
-        {item.lastMessage || 'Няма съобщения'}
-      </Text>
-      
-      <View style={styles.conversationMeta}>
-        <Text style={styles.lastActivity}>
-          {formatLastActivity(item.lastActivity)}
-        </Text>
-        {item.urgency && (
-          <View style={[styles.urgencyBadge, { backgroundColor: getUrgencyColor(item.urgency) }]}>
-            <Text style={styles.urgencyText}>
-              {getUrgencyLabel(item.urgency)}
-            </Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-
-  const getStatusColor = (status: string): string => {
-    const colors = {
-      ai_active: theme.colors.primary.solid,
-      ivan_taken_over: theme.colors.success.solid,
-      closed: theme.colors.text.tertiary,
-      handoff_requested: theme.colors.warning.solid,
-    };
-    return colors[status as keyof typeof colors] || theme.colors.text.tertiary;
-  };
-
-  const getStatusLabel = (status: string): string => {
-    const labels = {
-      ai_active: 'AI активен',
-      ivan_taken_over: 'Иван пое',
-      closed: 'Затворен',
-      handoff_requested: 'Изисква поемане',
-    };
-    return labels[status as keyof typeof labels] || status;
-  };
-
-  const getUrgencyColor = (urgency: string): string => {
-    const colors = {
-      low: theme.colors.success.solid,
-      medium: theme.colors.warning.solid,
-      high: '#e67e22',
-      emergency: theme.colors.danger.solid,
-    };
-    return colors[urgency as keyof typeof colors] || theme.colors.text.tertiary;
-  };
-
-  const getUrgencyLabel = (urgency: string): string => {
-    const labels = {
-      low: 'Ниско',
-      medium: 'Средно',
-      high: 'Високо',
-      emergency: 'Спешно',
-    };
-    return labels[urgency as keyof typeof labels] || urgency;
-  };
-
-  const formatLastActivity = (timestamp: string): string => {
-    const now = new Date();
-    const last = new Date(timestamp);
-    const diffMs = now.getTime() - last.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+  const formatTime = (timestamp: string) => {
+    if (!timestamp) return 'NaN';
     
+    // Handle "YYYY-MM-DD HH:MM:SS" format from backend
+    const date = new Date(timestamp.replace(' ', 'T'));
+    
+    if (isNaN(date.getTime())) return 'NaN';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
     if (diffMins < 1) return 'Сега';
     if (diffMins < 60) return `${diffMins}м`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)}ч`;
     return `${Math.floor(diffMins / 1440)}д`;
   };
 
+  const renderConversationItem = ({ item }: { item: Conversation }) => (
+    <TouchableOpacity
+      style={styles.conversationItem}
+      onPress={() => handleConversationPress(item)}
+    >
+      <View style={styles.avatarContainer}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {(item.customerName || 'C').charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        {item.unreadCount > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>{item.unreadCount}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.conversationContent}>
+        <View style={styles.conversationHeader}>
+          <Text style={styles.providerName} numberOfLines={1}>
+            {item.customerName || 'Customer'}
+          </Text>
+          <Text style={styles.timestamp}>
+            {formatTime(item.lastActivity || item.updatedAt)}
+          </Text>
+        </View>
+        <Text style={styles.lastMessage} numberOfLines={2}>
+          {item.lastMessage || 'Няма съобщения'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   if (isLoading && conversations.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Зареждане на разговори...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6366F1" />
+          <Text style={styles.loadingText}>Зареждане на разговори...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>💬 Разговори</Text>
-        <Text style={styles.subtitle}>
-          {conversations.filter(c => c.status !== 'closed').length} активни разговора
+        <Text style={styles.headerTitle}>💬 Съобщения</Text>
+        <Text style={styles.headerSubtitle}>
+          {conversations.length} {conversations.length === 1 ? 'разговор' : 'разговора'}
         </Text>
       </View>
 
-      <View style={styles.content}>
+      {conversations.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>💬</Text>
+          <Text style={styles.emptyTitle}>Няма разговори</Text>
+          <Text style={styles.emptyText}>
+            Започнете разговор с доставчик на услуги
+          </Text>
+        </View>
+      ) : (
         <FlatList
           data={conversations}
           renderItem={renderConversationItem}
           keyExtractor={(item) => item.id}
           refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor="#6366F1"
+            />
           }
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.conversationsContent}
+          contentContainerStyle={styles.listContent}
         />
-      </View>
-    </View>
+      )}
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: '#0F172A',
   },
   header: {
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.background.secondary,
+    padding: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.gray[200],
-    ...theme.shadows.sm,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
   },
-  title: {
-    fontSize: theme.typography.h3.fontSize,
-    fontWeight: theme.typography.h3.fontWeight,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: theme.typography.bodySmall.fontSize,
-    color: theme.colors.text.secondary,
-  },
-  content: {
-    flex: 1,
-    backgroundColor: theme.colors.background.secondary,
-  },
-  conversationsContent: {
-    paddingBottom: theme.spacing.md,
-  },
-  conversationItem: {
-    padding: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.gray[200],
-    minHeight: 90,
-    backgroundColor: theme.colors.background.secondary,
-  },
-  closedConversation: {
-    opacity: 0.6,
-  },
-  conversationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  customerName: {
-    fontSize: theme.typography.body.fontSize,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.lg,
-  },
-  statusText: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.typography.caption.fontSize,
-    fontWeight: '600',
-  },
-  lastMessage: {
-    fontSize: theme.typography.bodySmall.fontSize,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-    lineHeight: 18,
-    flexWrap: 'wrap',
-    flexShrink: 1,
-  },
-  conversationMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  lastActivity: {
-    fontSize: theme.typography.caption.fontSize,
-    color: theme.colors.text.tertiary,
-  },
-  urgencyBadge: {
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.md,
-  },
-  urgencyText: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.typography.caption.fontSize,
-    fontWeight: '600',
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#CBD5E1',
   },
   loadingContainer: {
     flex: 1,
@@ -469,9 +251,102 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.typography.body.fontSize,
-    color: theme.colors.text.secondary,
+    marginTop: 16,
+    fontSize: 16,
+    color: '#CBD5E1',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  listContent: {
+    paddingVertical: 8,
+  },
+  conversationItem: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  unreadText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  conversationContent: {
+    flex: 1,
+  },
+  conversationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  providerName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginRight: 8,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#CBD5E1',
+    lineHeight: 20,
   },
 });
 

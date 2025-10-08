@@ -51,6 +51,43 @@ export default function SurveyModal({
     return Math.round(average * 2) / 2
   }
 
+  // Reusable SVG Star component for consistent shapes
+  const Star = ({
+    variant,
+    size = 24,
+  }: { variant: 'full' | 'half' | 'empty'; size?: number }) => {
+    // Unique id for gradient per star instance
+    const id = Math.random().toString(36).slice(2)
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="inline-block align-middle"
+      >
+        {variant === 'half' && (
+          <defs>
+            <linearGradient id={`half-${id}`} x1="0" x2="1" y1="0" y2="0">
+              <stop offset="50%" stopColor="#fbbf24" />
+              <stop offset="50%" stopColor="#64748b" />
+            </linearGradient>
+          </defs>
+        )}
+        <path
+          d="M12 .587l3.668 7.429 8.2 1.192-5.934 5.786 1.402 8.173L12 18.896l-7.336 3.871 1.402-8.173L.132 9.208l8.2-1.192L12 .587z"
+          fill={
+            variant === 'full'
+              ? '#fbbf24' // yellow-400
+              : variant === 'half'
+              ? `url(#half-${id})`
+              : '#64748b' // slate-500
+          }
+        />
+      </svg>
+    )
+  }
+
   const handleStarClick = (field: keyof SurveyData, value: number) => {
     setSurveyData(prev => {
       const newData = { ...prev, [field]: value }
@@ -71,28 +108,19 @@ export default function SurveyModal({
     })
   }
 
-  // Render stars with half-star support for display only
+  // Render stars for display (overall rating) with proper half support
   const renderStarsDisplay = (rating: number) => {
-    const stars = []
+    const stars: JSX.Element[] = []
+    const full = Math.floor(rating)
+    const hasHalf = Math.abs(rating - full - 0.5) < 1e-9
+
     for (let i = 1; i <= 5; i++) {
-      if (i <= rating) {
-        // Full star
-        stars.push(
-          <span key={i} className="text-2xl text-yellow-400">⭐</span>
-        )
-      } else if (i - 0.5 <= rating) {
-        // Half star - using a combination of full and empty
-        stars.push(
-          <span key={i} className="text-2xl relative inline-block">
-            <span className="text-gray-300">⭐</span>
-            <span className="absolute inset-0 text-yellow-400 overflow-hidden" style={{ width: '50%' }}>⭐</span>
-          </span>
-        )
+      if (i <= full) {
+        stars.push(<Star key={i} variant="full" />)
+      } else if (i === full + 1 && hasHalf) {
+        stars.push(<Star key={i} variant="half" />)
       } else {
-        // Empty star
-        stars.push(
-          <span key={i} className="text-2xl text-gray-300">⭐</span>
-        )
+        stars.push(<Star key={i} variant="empty" />)
       }
     }
     return stars
@@ -100,27 +128,26 @@ export default function SurveyModal({
 
   const renderStars = (field: keyof SurveyData, currentValue: number) => {
     return (
-      <div className="flex space-x-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            onClick={(e) => {
-              e.preventDefault()
-              handleStarClick(field, star)
-            }}
-            className={`text-2xl transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 rounded ${
-              star <= currentValue
-                ? 'text-yellow-400 hover:text-yellow-500'
-                : 'text-gray-300 hover:text-yellow-300'
-            }`}
-            title={`Оценка ${star} от 5`}
-          >
-            ⭐
-          </button>
-        ))}
+      <div className="flex items-center space-x-1">
+        {[1, 2, 3, 4, 5].map((star) => {
+          const isSelected = star <= currentValue
+          return (
+            <button
+              key={star}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                handleStarClick(field, star)
+              }}
+              className="transition-transform duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 rounded"
+              title={`Оценка ${star} от 5`}
+            >
+              <Star variant={isSelected ? 'full' : 'empty'} />
+            </button>
+          )
+        })}
         {currentValue > 0 && (
-          <span className="ml-2 text-sm text-gray-600">
+          <span className="ml-2 text-sm text-slate-400">
             {currentValue}/5
           </span>
         )}
@@ -158,7 +185,13 @@ export default function SurveyModal({
       onClose()
     } catch (err: any) {
       console.error('Error submitting survey:', err)
-      setError(err.response?.data?.message || 'Възникна грешка при изпращането на оценката')
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message
+      
+      if (err.response?.status === 409 || errorMessage?.includes('already exists')) {
+        setError('Вие вече сте оценили тази услуга. Не можете да изпратите повторна оценка.')
+      } else {
+        setError(errorMessage || 'Възникна грешка при изпращането на оценката')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -167,44 +200,44 @@ export default function SurveyModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-slate-800/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Оценете услугата</h2>
-              <p className="text-gray-600 mt-1">Как оценявате работата на {providerName}?</p>
+              <h2 className="text-2xl font-bold text-white">Оценете услугата</h2>
+              <p className="text-slate-300 mt-1">Как оценявате работата на {providerName}?</p>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
+              className="text-slate-400 hover:text-white text-2xl transition-colors"
             >
               ✕
             </button>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-red-800">{error}</p>
+            <div className="bg-red-500/20 border border-red-400/30 rounded-lg p-4 mb-6">
+              <p className="text-red-300">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Overall Rating - Auto-calculated */}
             <div>
-              <label className="block text-lg font-semibold text-gray-900 mb-3">
-                Обща оценка <span className="text-red-500">*</span>
+              <label className="block text-lg font-semibold text-white mb-3">
+                Обща оценка <span className="text-red-400">*</span>
               </label>
               <div className="flex items-center space-x-2 mb-2">
                 <div className="flex space-x-1">
                   {renderStarsDisplay(surveyData.rating)}
                 </div>
-                <span className="ml-2 text-lg font-medium text-gray-700">
+                <span className="ml-2 text-lg font-medium text-slate-200">
                   {surveyData.rating > 0 ? `${surveyData.rating}/5` : 'Не е оценено'}
                 </span>
               </div>
-              <p className="text-sm text-blue-600 mt-2">
+              <p className="text-sm text-indigo-400 mt-2">
                 Общата оценка се изчислява автоматично като средна стойност (с половин звезди)
               </p>
             </div>
@@ -212,28 +245,28 @@ export default function SurveyModal({
             {/* Detailed Ratings */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Комуникация
                 </label>
                 {renderStars('communication', surveyData.communication || 0)}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Качество на работата
                 </label>
                 {renderStars('quality', surveyData.quality || 0)}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Спазване на срокове
                 </label>
                 {renderStars('timeliness', surveyData.timeliness || 0)}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-200 mb-2">
                   Съотношение цена/качество
                 </label>
                 {renderStars('valueForMoney', surveyData.valueForMoney || 0)}
@@ -242,7 +275,7 @@ export default function SurveyModal({
 
             {/* Would Recommend */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-slate-200 mb-3">
                 Бихте ли препоръчали този специалист?
               </label>
               <div className="flex space-x-4">
@@ -251,8 +284,8 @@ export default function SurveyModal({
                   onClick={() => setSurveyData(prev => ({ ...prev, wouldRecommend: true }))}
                   className={`px-4 py-2 rounded-lg border transition-colors ${
                     surveyData.wouldRecommend === true
-                      ? 'bg-green-100 border-green-500 text-green-700'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-green-500/20 border-green-400/50 text-green-300'
+                      : 'border-white/20 text-slate-300 hover:bg-white/10'
                   }`}
                 >
                   👍 Да
@@ -262,8 +295,8 @@ export default function SurveyModal({
                   onClick={() => setSurveyData(prev => ({ ...prev, wouldRecommend: false }))}
                   className={`px-4 py-2 rounded-lg border transition-colors ${
                     surveyData.wouldRecommend === false
-                      ? 'bg-red-100 border-red-500 text-red-700'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-red-500/20 border-red-400/50 text-red-300'
+                      : 'border-white/20 text-slate-300 hover:bg-white/10'
                   }`}
                 >
                   👎 Не
@@ -273,32 +306,32 @@ export default function SurveyModal({
 
             {/* Comment */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-200 mb-2">
                 Коментар (по желание)
               </label>
               <textarea
                 value={surveyData.comment}
                 onChange={(e) => setSurveyData(prev => ({ ...prev, comment: e.target.value }))}
                 rows={4}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-700/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 placeholder="Споделете вашето мнение за услугата..."
               />
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex justify-end space-x-3 pt-4 border-t">
+            <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-colors"
+                className="px-6 py-2 text-slate-300 bg-slate-700 rounded-lg hover:bg-slate-600 disabled:opacity-50 transition-colors"
               >
                 Отказ
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || surveyData.rating === 0}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/30"
               >
                 {isSubmitting ? 'Изпращане...' : 'Изпрати оценка'}
               </button>

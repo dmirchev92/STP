@@ -1,10 +1,7 @@
 'use client'
 
 import { Hero } from '@/components/Hero'
-import { SearchSection } from '@/components/SearchSection'
 import { ServiceCategories } from '@/components/ServiceCategories'
-import { HowItWorks } from '@/components/HowItWorks'
-import { Testimonials } from '@/components/Testimonials'
 import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
 import PendingSurveys from '@/components/PendingSurveys'
@@ -22,10 +19,7 @@ export default function HomePage() {
           <PendingSurveys />
         </div>
         
-        <SearchSection />
         <ServiceCategories />
-        <HowItWorks />
-        <Testimonials />
       </main>
       
       <Footer />

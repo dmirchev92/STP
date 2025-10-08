@@ -246,6 +246,8 @@ export class SQLiteDatabase {
         case_data TEXT NOT NULL, -- JSON with customer responses
         status TEXT DEFAULT 'template_sent' CHECK (status IN ('template_sent', 'filled_by_customer', 'pending_provider', 'accepted', 'declined', 'in_queue', 'assigned', 'in_progress', 'completed', 'cancelled')),
         priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+        city TEXT,
+        neighborhood TEXT,
         estimated_cost DECIMAL(10,2),
         estimated_duration INTEGER, -- in minutes
         scheduled_date DATETIME,
@@ -387,7 +389,8 @@ export class SQLiteDatabase {
           preferred_date TEXT,
           preferred_time TEXT DEFAULT 'morning',
           priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'urgent')),
-          address TEXT NOT NULL,
+          city TEXT,
+          neighborhood TEXT,
           phone TEXT NOT NULL,
           additional_details TEXT,
           provider_id TEXT,
@@ -409,6 +412,23 @@ export class SQLiteDatabase {
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (case_id) REFERENCES marketplace_service_cases(id) ON DELETE CASCADE
       );
+
+      -- SMS Settings Table (synchronized between mobile app and web app)
+      CREATE TABLE IF NOT EXISTS sms_settings (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL UNIQUE,
+          is_enabled INTEGER DEFAULT 0,
+          message_template TEXT DEFAULT 'Zaet sum, shte vurna obajdane sled nqkolko minuti.\n\nZapochnete chat tuk:\n[chat_link]\n\n',
+          last_sent_time INTEGER,
+          sent_count INTEGER DEFAULT 0,
+          sent_call_ids TEXT DEFAULT '[]',
+          filter_known_contacts INTEGER DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_sms_settings_user_id ON sms_settings(user_id);
 
     `;
 
@@ -1345,7 +1365,7 @@ export class SQLiteDatabase {
         ORDER BY last_message_at DESC
       `;
 
-          this._db.all(query, [userId, userId], (err, rows) => {
+          this._db.all(query, [userId], (err, rows) => {
             if (err) {
               console.error('❌ Error getting user conversations:', err);
               reject(err);
@@ -1667,6 +1687,147 @@ export class SQLiteDatabase {
   }
 
   // Old chat token methods removed - using new ChatTokenService
+
+  /**
+   * SMS Settings Methods
+   */
+  
+  /**
+   * Get SMS settings for a user (creates default if doesn't exist)
+   */
+  async getSMSSettings(userId: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this._db.get(
+        `SELECT * FROM sms_settings WHERE user_id = ?`,
+        [userId],
+        (err, row: any) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          
+          if (row) {
+            // Parse JSON fields
+            resolve({
+              id: row.id,
+              userId: row.user_id,
+              isEnabled: Boolean(row.is_enabled),
+              message: row.message_template,
+              lastSentTime: row.last_sent_time,
+              sentCount: row.sent_count,
+              sentCallIds: JSON.parse(row.sent_call_ids || '[]'),
+              filterKnownContacts: Boolean(row.filter_known_contacts),
+              createdAt: row.created_at,
+              updatedAt: row.updated_at
+            });
+          } else {
+            // Create default settings for this user
+            const id = this.generateId();
+            this._db.run(
+              `INSERT INTO sms_settings (id, user_id) VALUES (?, ?)`,
+              [id, userId],
+              (err) => {
+                if (err) {
+                  reject(err);
+                } else {
+                  // Return default settings (SMS OFF by default)
+                  resolve({
+                    id,
+                    userId,
+                    isEnabled: false,
+                    message: 'Zaet sum, shte vurna obajdane sled nqkolko minuti.\n\nZapochnete chat tuk:\n[chat_link]\n\n',
+                    lastSentTime: null,
+                    sentCount: 0,
+                    sentCallIds: [],
+                    filterKnownContacts: true,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                  });
+                }
+              }
+            );
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * Update SMS settings for a user
+   */
+  async updateSMSSettings(userId: string, updates: {
+    isEnabled?: boolean;
+    message?: string;
+    lastSentTime?: number;
+    sentCount?: number;
+    sentCallIds?: string[];
+    filterKnownContacts?: boolean;
+  }): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const fields: string[] = [];
+      const values: any[] = [];
+
+      if (updates.isEnabled !== undefined) {
+        fields.push('is_enabled = ?');
+        values.push(updates.isEnabled ? 1 : 0);
+      }
+      if (updates.message !== undefined) {
+        fields.push('message_template = ?');
+        values.push(updates.message);
+      }
+      if (updates.lastSentTime !== undefined) {
+        fields.push('last_sent_time = ?');
+        values.push(updates.lastSentTime);
+      }
+      if (updates.sentCount !== undefined) {
+        fields.push('sent_count = ?');
+        values.push(updates.sentCount);
+      }
+      if (updates.sentCallIds !== undefined) {
+        fields.push('sent_call_ids = ?');
+        values.push(JSON.stringify(updates.sentCallIds));
+      }
+      if (updates.filterKnownContacts !== undefined) {
+        fields.push('filter_known_contacts = ?');
+        values.push(updates.filterKnownContacts ? 1 : 0);
+      }
+
+      if (fields.length === 0) {
+        resolve();
+        return;
+      }
+
+      fields.push('updated_at = CURRENT_TIMESTAMP');
+      values.push(userId);
+
+      this._db.run(
+        `UPDATE sms_settings SET ${fields.join(', ')} WHERE user_id = ?`,
+        values,
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+  }
+
+  /**
+   * Clear SMS history (sent call IDs) for a user
+   */
+  async clearSMSHistory(userId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this._db.run(
+        `UPDATE sms_settings 
+         SET sent_call_ids = '[]', updated_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ?`,
+        [userId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+  }
 
   // Close database connection
   close(): void {

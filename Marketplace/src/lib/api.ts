@@ -114,7 +114,13 @@ class ApiClient {
 
   // Messaging endpoints (connects to your existing messaging system)
   async getConversations() {
-    return this.client.get('/messaging/conversations')
+    // Get current user to determine correct endpoint
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (user.role === 'customer') {
+      return this.client.get(`/chat/user/${user.id}/conversations`)
+    } else {
+      return this.client.get(`/chat/provider/${user.id}/conversations`)
+    }
   }
 
   // User profile endpoints
@@ -252,6 +258,21 @@ class ApiClient {
     }
   }
 
+  async declineCase(caseId: string, providerId: string, reason?: string) {
+    console.log('📋 API Client - Declining case:', caseId, 'by provider:', providerId)
+    return this.client.post(`/cases/${caseId}/decline`, { providerId, reason })
+  }
+
+  async getDeclinedCases(providerId: string) {
+    console.log('🚫 API Client - Getting declined cases for provider:', providerId)
+    return this.client.get(`/cases/declined/${providerId}`)
+  }
+
+  async undeclineCase(caseId: string, providerId: string) {
+    console.log('✅ API Client - Un-declining case:', caseId, 'for provider:', providerId)
+    return this.client.post(`/cases/${caseId}/undecline`, { providerId })
+  }
+
   async updateCaseStatus(caseId: string, status: string, message?: string) {
     console.log('📋 API Client - Updating case status:', caseId, status)
     if (status === 'completed' || status === 'closed') {
@@ -366,6 +387,8 @@ class ApiClient {
   async getCasesWithFilters(filters: {
     status?: string
     category?: string
+    city?: string
+    neighborhood?: string
     providerId?: string
     customerId?: string
     createdByUserId?: string
@@ -416,6 +439,11 @@ class ApiClient {
     if (endDate) params.append('endDate', endDate)
     const queryString = params.toString() ? `?${params.toString()}` : ''
     return this.client.get(`/income/provider/${providerId}${queryString}`)
+  }
+
+  async getIncomeYears(providerId: string) {
+    console.log('📅 API Client - Getting income years for provider:', providerId)
+    return this.client.get(`/income/provider/${providerId}/years`)
   }
 
   async getIncomeTransactionsByMethod(providerId: string, paymentMethod: string) {

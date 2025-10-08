@@ -118,6 +118,15 @@ export default function NotificationsPage() {
       if (caseId) {
         router.push(`/survey/${caseId}`)
       }
+    } else if (notification.type === 'case_assigned') {
+      // Navigate to dashboard cases page - case will be in "Моите заявки"
+      const caseId = notification.data?.caseId
+      if (caseId) {
+        console.log('🔔 Navigating to case:', caseId)
+        router.push('/dashboard/cases')
+      } else {
+        router.push('/dashboard/cases')
+      }
     } else if (notification.type === 'case_accepted') {
       // Navigate to dashboard or case details
       router.push('/dashboard')
@@ -131,6 +140,8 @@ export default function NotificationsPage() {
     switch (type) {
       case 'case_completed':
         return '🌟'
+      case 'case_assigned':
+        return '📬'
       case 'case_accepted':
         return '✅'
       case 'case_declined':
@@ -147,6 +158,8 @@ export default function NotificationsPage() {
     switch (type) {
       case 'case_completed':
         return 'from-yellow-500/10 to-orange-500/10 border-yellow-400/30'
+      case 'case_assigned':
+        return 'from-indigo-500/10 to-purple-500/10 border-indigo-400/30'
       case 'case_accepted':
         return 'from-green-500/10 to-emerald-500/10 border-green-400/30'
       case 'case_declined':

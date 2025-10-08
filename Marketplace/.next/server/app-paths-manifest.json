@@ -1,7 +1,5 @@
 {
-  "/u/[spIdentifier]/c/[token]/page": "app/u/[spIdentifier]/c/[token]/page.js",
+  "/page": "app/page.js",
   "/search/page": "app/search/page.js",
-  "/auth/login/page": "app/auth/login/page.js",
-  "/create-case/page": "app/create-case/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/u/[spIdentifier]/c/[token]/page": "app/u/[spIdentifier]/c/[token]/page.js"
 }

@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import UnifiedCaseModal from './UnifiedCaseModal';
 import ServiceRequestButton from './ServiceRequestButton';
 import SurveyModal from './SurveyModal';
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSocket } from '@/contexts/SocketContext'
 
 interface ServiceProvider {
   id: string
@@ -54,6 +55,7 @@ interface ChatModalProps {
 
 export default function ChatModal({ provider, isOpen, onClose }: ChatModalProps) {
   const { user, isAuthenticated } = useAuth()
+  const { socket, isConnected } = useSocket() // Use global socket from context
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -62,7 +64,6 @@ export default function ChatModal({ provider, isOpen, onClose }: ChatModalProps)
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [isStarted, setIsStarted] = useState(false)
-  const [socket, setSocket] = useState<Socket | null>(null)
   const [showUnifiedModal, setShowUnifiedModal] = useState(false)
   const [currentTemplate, setCurrentTemplate] = useState<any>(null)
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
@@ -112,56 +113,18 @@ export default function ChatModal({ provider, isOpen, onClose }: ChatModalProps)
     }
   }, [isOpen, isAuthenticated, user, provider.id])
 
-  // Initialize socket for real-time messaging
+  // Join conversation room when modal opens
   useEffect(() => {
-    if (!isOpen || !conversationId || typeof window === 'undefined') return
+    if (!isOpen || !conversationId || !socket || !isConnected) return
 
-    const initSocket = () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.129:3000/api/v1'
-        const socketUrl = apiUrl.replace('/api/v1', '')
-        
-        console.log('💬 Customer connecting to socket:', socketUrl)
-        
-        const socketInstance = io(socketUrl, {
-          transports: ['websocket', 'polling'],
-          timeout: 10000,
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000
-        })
-
-        socketInstance.on('connect', () => {
-          console.log('✅ Customer connected to WebSocket server')
-          setSocket(socketInstance)
-          
-          // Join conversation room for real-time updates
-          socketInstance.emit('join-conversation', conversationId)
-          console.log('🏠 Customer joined conversation room:', conversationId)
-        })
-
-        socketInstance.on('disconnect', (reason) => {
-          console.log('❌ Customer disconnected from WebSocket server:', reason)
-        })
-
-        socketInstance.on('connect_error', (error) => {
-          console.error('❌ Customer WebSocket connection error:', error)
-        })
-
-      } catch (error) {
-        console.error('Failed to create customer socket:', error)
-      }
-    }
-
-    initSocket()
+    console.log('🏠 ChatModal - Joining conversation room:', conversationId)
+    socket.emit('join-conversation', conversationId)
 
     return () => {
-      if (socket) {
-        socket.disconnect()
-        console.log('🔌 Customer socket disconnected')
-      }
+      console.log('🚪 ChatModal - Leaving conversation room:', conversationId)
+      // Don't disconnect the global socket, just leave the room
     }
-  }, [isOpen, conversationId])
+  }, [isOpen, conversationId, socket, isConnected])
 
   // Setup real-time message listeners
   useEffect(() => {

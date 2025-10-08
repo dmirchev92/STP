@@ -408,8 +408,13 @@ class ServiceTextProServer {
     this.app.put('/api/v1/cases/:caseId/status', caseController.updateCaseStatus);
     this.app.post('/api/v1/cases/:caseId/auto-assign', caseController.autoAssignCase);
 
+    // Declined cases routes
+    this.app.get('/api/v1/cases/declined/:providerId', authenticateToken, caseController.getDeclinedCases);
+    this.app.post('/api/v1/cases/:caseId/undecline', authenticateToken, caseController.undeclineCase);
+
     // Income tracking routes
     this.app.get('/api/v1/income/provider/:providerId', authenticateToken, caseController.getIncomeStats);
+    this.app.get('/api/v1/income/provider/:providerId/years', authenticateToken, caseController.getIncomeYears);
     this.app.get('/api/v1/income/provider/:providerId/method/:paymentMethod', authenticateToken, caseController.getIncomeTransactionsByMethod);
     this.app.get('/api/v1/income/provider/:providerId/month/:month', authenticateToken, caseController.getIncomeTransactionsByMonth);
     this.app.put('/api/v1/income/:incomeId', authenticateToken, caseController.updateIncomeTransaction);

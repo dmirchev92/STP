@@ -15,6 +15,8 @@ import ChatDetailScreen from '../screens/ChatDetailScreen';
 import SMSScreen from '../screens/SMSScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ReferralDashboardScreen from '../screens/ReferralDashboardScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 
 
 // Import components
@@ -97,14 +99,27 @@ function MainTabNavigator() {
         options={{
           tabBarLabel: 'Настройки',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Text style={{ color, fontSize: size }}>⚙️</Text>
+            <Text style={{ fontSize: size, color }}>⚙️</Text>
           ),
+        }}
+      />
+      <Tab.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{
+          tabBarButton: () => null, // Hide from tab bar
+        }}
+      />
+      <Tab.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{
+          tabBarButton: () => null, // Hide from tab bar
         }}
       />
     </Tab.Navigator>
   );
 }
-
 // Settings stack navigator
 function SettingsStackNavigator() {
   return (

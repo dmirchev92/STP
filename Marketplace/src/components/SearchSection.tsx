@@ -222,9 +222,8 @@ export function SearchSection() {
                 value={searchData.serviceType}
                 onChange={(e) => setSearchData({ ...searchData, serviceType: e.target.value })}
                 className="input-field"
-                required
               >
-                <option value="">Изберете услуга</option>
+                <option value="">Всички услуги</option>
                 {serviceTypes.map((service) => (
                   <option key={service.value} value={service.value}>
                     {service.label}
@@ -236,7 +235,7 @@ export function SearchSection() {
             {/* City */}
             <div>
               <label className="block text-sm font-medium text-white mb-2">
-                Град
+                Град <span className="text-red-400">*</span>
               </label>
               <select
                 value={searchData.city}

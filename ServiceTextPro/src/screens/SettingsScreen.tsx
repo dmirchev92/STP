@@ -148,6 +148,45 @@ const SettingsScreen: React.FC = () => {
     navigation.navigate('ReferralDashboard');
   };
 
+  const handleEditProfile = () => {
+    navigation.navigate('EditProfile');
+  };
+
+  const handleChangePassword = () => {
+    navigation.navigate('ChangePassword');
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Изход',
+      'Сигурни ли сте, че искате да излезете?',
+      [
+        { text: 'Отказ', style: 'cancel' },
+        {
+          text: 'Изход',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              await AsyncStorage.removeItem('auth_token');
+              // Clear API service token if method exists
+              const apiService = ApiService.getInstance();
+              if (typeof (apiService as any).clearToken === 'function') {
+                (apiService as any).clearToken();
+              }
+              Alert.alert('Успех', 'Излязохте успешно от профила си');
+              // TODO: Navigate to login screen
+              // navigation.navigate('Auth');
+            } catch (error) {
+              console.error('Error logging out:', error);
+              Alert.alert('Грешка', 'Неуспешен изход');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -224,11 +263,11 @@ const SettingsScreen: React.FC = () => {
         {/* Other Settings Sections */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>👤 Профил</Text>
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={styles.settingItem} onPress={handleEditProfile}>
             <Text style={styles.settingItemText}>Редактирай профил</Text>
             <Text style={styles.settingItemArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={styles.settingItem} onPress={handleChangePassword}>
             <Text style={styles.settingItemText}>Смени парола</Text>
             <Text style={styles.settingItemArrow}>›</Text>
           </TouchableOpacity>
@@ -264,7 +303,7 @@ const SettingsScreen: React.FC = () => {
 
         {/* Logout Button */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.logoutButton}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutButtonText}>🚪 Изход</Text>
           </TouchableOpacity>
         </View>
@@ -276,42 +315,46 @@ const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#0F172A', // Dark slate background matching web
   },
   scrollView: {
     flex: 1,
   },
   header: {
     padding: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.1)', // Glass-morphism effect
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: 'rgba(255,255,255,0.2)',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#CBD5E1',
   },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.1)', // Glass-morphism
     marginTop: 12,
+    marginHorizontal: 16,
     paddingHorizontal: 20,
     paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#CBD5E1',
     marginBottom: 16,
   },
   loadingContainer: {
@@ -320,14 +363,14 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 8,
-    color: '#6B7280',
+    color: '#CBD5E1',
   },
   errorContainer: {
     alignItems: 'center',
     paddingVertical: 20,
   },
   errorText: {
-    color: '#DC2626',
+    color: '#FCA5A5',
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -436,18 +479,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: 'rgba(255,255,255,0.2)',
   },
   settingItemText: {
     fontSize: 16,
-    color: '#374151',
+    color: '#CBD5E1',
   },
   settingItemArrow: {
     fontSize: 18,
-    color: '#9CA3AF',
+    color: '#94A3B8',
   },
   logoutButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#EF4444',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,

@@ -55,6 +55,15 @@ export class ModernCallDetectionService {
       this.setupEventListeners();
       this.isInitialized = true;
       console.log('📱 Modern call detection service initialized');
+      
+      // Start the native call detection
+      ModernCallDetectionModule.startCallDetection()
+        .then(() => {
+          console.log('✅ Native call detection started');
+        })
+        .catch((error: any) => {
+          console.error('❌ Failed to start native call detection:', error);
+        });
     } else {
       console.error('❌ ModernCallDetectionModule not found');
     }
@@ -71,6 +80,8 @@ export class ModernCallDetectionService {
 
   private async handleMissedCall(event: MissedCallEvent): Promise<void> {
     try {
+      console.log('🚨 MISSED CALL HANDLER TRIGGERED:', event);
+      
       // Store the call event locally
       await this.storeMissedCall(event);
 
@@ -129,8 +140,21 @@ export class ModernCallDetectionService {
 
   private async sendAutomaticSMS(event: MissedCallEvent): Promise<void> {
     try {
+      console.log('🔔 sendAutomaticSMS called for:', event.phoneNumber, 'Contact:', event.contactName);
+      
+      // Skip SMS for test events
+      if (event.source === 'test') {
+        console.log('🧪 Test event detected, skipping SMS');
+        return;
+      }
+      
       const smsService = SMSService.getInstance();
       const smsConfig = smsService.getConfig();
+      
+      console.log('📱 SMS Config check:', {
+        isEnabled: smsConfig.isEnabled,
+        filterKnownContacts: smsConfig.filterKnownContacts
+      });
       
       if (!smsConfig.isEnabled) {
         console.log('📱 SMS sending is disabled, skipping automatic SMS');
@@ -139,6 +163,7 @@ export class ModernCallDetectionService {
 
       // Generate a unique call ID for this missed call
       const callId = `call_${event.timestamp}_${event.phoneNumber}`;
+      console.log('📱 Generated call ID:', callId);
       
       // Check if SMS has already been sent for this call
       if (smsService.hasSMSSentForCall(callId)) {
@@ -352,14 +377,26 @@ export class ModernCallDetectionService {
 
   private async getCurrentUser(): Promise<any> {
     try {
-      const response = await ApiService.getInstance().getCurrentUser();
-      return response.success && response.data?.user ? response.data.user : null;
+      // Try to get from AsyncStorage first (faster, no rate limit)
+      const userStr = await AsyncStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        console.log('✅ Got user from AsyncStorage:', user.id);
+        return user;
+      }
+      
+      // Fallback to API
+      const apiService = ApiService.getInstance();
+      const response = await apiService.getCurrentUser();
+      const user = response.data?.user || response.data;
+      // Store user in AsyncStorage for faster access next time
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      return user;
     } catch (error) {
       console.error('❌ Error getting current user:', error);
       return null;
     }
   }
-
   public async clearUserData(): Promise<void> {
     try {
       // Clear all user-specific missed calls data
@@ -375,11 +412,50 @@ export class ModernCallDetectionService {
     }
   }
 
+  public async testContactFiltering(): Promise<boolean> {
+    try {
+      console.log('🧪 Testing contact filtering (no SMS will be sent)...');
+      
+      const testNumber = '+359888123456';
+      
+      // Check contact filtering only
+      const smsService = SMSService.getInstance();
+      const config = smsService.getConfig();
+      
+      console.log('📱 SMS Config:', {
+        isEnabled: config.isEnabled,
+        filterKnownContacts: config.filterKnownContacts
+      });
+      
+      if (config.filterKnownContacts) {
+        console.log('📱 Contact filtering is ENABLED, checking contacts...');
+        const { ContactService } = await import('./ContactService');
+        const contactService = ContactService.getInstance();
+        const contactInfo = await contactService.isPhoneNumberInContacts(testNumber);
+        
+        console.log('📱 Contact check result:', contactInfo);
+        
+        if (contactInfo.isInContacts) {
+          console.log(`🚫 TEST RESULT: SMS would be BLOCKED - ${testNumber} is in contacts (${contactInfo.contactName})`);
+        } else {
+          console.log(`✅ TEST RESULT: SMS would be SENT - ${testNumber} is NOT in contacts`);
+        }
+      } else {
+        console.log('📱 Contact filtering is DISABLED - SMS would be sent to any number');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error testing contact filtering:', error);
+      return false;
+    }
+  }
+
   public async testMissedCall(): Promise<boolean> {
     if (!this.isInitialized) return false;
 
     try {
-      console.log('🧪 Testing missed call detection...');
+      console.log('🧪 Testing missed call detection (WILL SEND REAL SMS)...');
       
       const { ModernCallDetectionModule } = NativeModules;
       const result = await ModernCallDetectionModule.testMissedCall();

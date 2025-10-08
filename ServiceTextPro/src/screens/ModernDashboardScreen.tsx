@@ -226,10 +226,34 @@ function ModernDashboardScreen() {
       console.log('🔍 Dashboard - Calling getCurrentUser...');
       const response = await ApiService.getInstance().getCurrentUser();
       console.log('🔍 Dashboard - getCurrentUser response:', response);
+      console.log('🔍 Dashboard - response.data:', JSON.stringify(response.data, null, 2));
       
       if (response.success && response.data) {
         console.log('✅ User data loaded from backend:', response.data);
-        setUser(response.data);
+        // Handle nested user object (common API pattern)
+        const rawData: any = response.data;
+        const userData: any = rawData.user || rawData;
+        
+        console.log('🔍 Checking user fields:', {
+          firstName: userData.firstName,
+          first_name: userData.first_name,
+          lastName: userData.lastName,
+          last_name: userData.last_name,
+          hasUserObject: !!rawData.user
+        });
+        
+        const mappedUser: User = {
+          id: userData.id,
+          email: userData.email,
+          firstName: userData.firstName || userData.first_name || 'Потребител',
+          lastName: userData.lastName || userData.last_name || '',
+          phoneNumber: userData.phoneNumber || userData.phone_number || '',
+          role: userData.role || 'tradesperson',
+          businessId: userData.businessId || userData.business_id,
+          isGdprCompliant: userData.isGdprCompliant || userData.is_gdpr_compliant || false,
+        };
+        console.log('📱 Mapped user data:', mappedUser);
+        setUser(mappedUser);
       } else {
         console.log('⚠️ No user data from backend, using mock user. Response:', response);
         const mockUser: User = {
