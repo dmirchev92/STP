@@ -3,19 +3,44 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSocket } from '@/contexts/SocketContext'
+import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { apiClient } from '@/lib/api'
+
+// Helper function to translate service categories to Bulgarian
+const getServiceCategoryLabel = (category: string | undefined): string => {
+  if (!category) return ''
+  
+  const categories: Record<string, string> = {
+    'electrician': 'Електротехник',
+    'plumber': 'Водопроводчик',
+    'hvac': 'Климатик',
+    'carpenter': 'Дърводелец',
+    'painter': 'Бояджия',
+    'locksmith': 'Ключар',
+    'cleaner': 'Почистване',
+    'gardener': 'Градинар',
+    'handyman': 'Майстор за всичко',
+    'appliance_repair': 'Ремонт на уреди',
+    'general': 'Друго'
+  }
+  
+  return categories[category] || category
+}
 
 interface Conversation {
   id: string
   customerName: string
   serviceProviderName: string
+  serviceCategory?: string
   lastMessage?: string
   lastActivity: string
   unreadCount: number
+  messageCount?: number
 }
 
 export default function ChatWidget() {
-  const [isOpen, setIsOpen] = useState(false)
+  const { isOpen, setIsOpen, activeProviderId, activeProviderName } = useChatWidget()
   const [isMinimized, setIsMinimized] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(false)
@@ -24,7 +49,7 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<any[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
-  const [socket, setSocket] = useState<any>(null)
+  const { socket, isConnected } = useSocket()
   const { user, isAuthenticated, isLoading } = useAuth()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
@@ -38,19 +63,40 @@ export default function ChatWidget() {
     hasUserData: typeof window !== 'undefined' ? !!localStorage.getItem('user_data') : 'SSR'
   })
 
-  // Load conversations when widget opens and set up global WebSocket
+  // Load conversations when widget opens and set up WebSocket listeners
   useEffect(() => {
     if (isOpen && isAuthenticated && user) {
       loadConversations()
       
-      // Set up periodic refresh every 10 seconds when widget is open (more frequent to catch customer name updates)
-      const refreshInterval = setInterval(() => {
-        loadConversations()
-      }, 10000)
-      
-      return () => clearInterval(refreshInterval)
+      // Join user's personal room for real-time updates
+      if (socket && isConnected) {
+        socket.emit('join-user', user.id)
+        console.log('💬 ChatWidget - Joined user room:', user.id)
+        
+        // Listen for conversation updates
+        const handleConversationsUpdated = () => {
+          console.log('💬 ChatWidget - Received conversations_updated event, reloading...')
+          loadConversations()
+        }
+        
+        socket.on('conversations_updated', handleConversationsUpdated)
+        
+        // Cleanup
+        return () => {
+          socket.off('conversations_updated', handleConversationsUpdated)
+        }
+      }
     }
-  }, [isOpen, isAuthenticated, user])
+  }, [isOpen, isAuthenticated, user, socket, isConnected])
+
+  // Handle opening with specific provider
+  useEffect(() => {
+    if (activeProviderId && isOpen && isAuthenticated && user) {
+      console.log('💬 ChatWidget - Opening with provider:', activeProviderId, activeProviderName)
+      // Start or get conversation with this provider
+      startConversationWithProvider(activeProviderId)
+    }
+  }, [activeProviderId, isOpen, isAuthenticated, user])
 
   // Calculate total unread messages
   useEffect(() => {
@@ -100,7 +146,6 @@ export default function ChatWidget() {
               setConversations(mappedConversations)
               console.log('💬 ChatWidget - Set provider conversations (object.conversations):', mappedConversations.length, mappedConversations)
             } else if (conversationsData.data && Array.isArray(conversationsData.data)) {
-              setConversations(conversationsData.data)
               console.log('💬 ChatWidget - Set provider conversations (object.data):', conversationsData.data.length, conversationsData.data)
             } else {
               // Try to convert object to array or handle single conversation
@@ -108,8 +153,16 @@ export default function ChatWidget() {
               const conversationsArray = Object.values(conversationsData).filter(item => 
                 item && typeof item === 'object' && 'id' in item
               ) as Conversation[]
-              setConversations(conversationsArray)
-              console.log('💬 ChatWidget - Converted object to array:', conversationsArray.length, conversationsArray)
+              
+              // Filter out conversations with no messages and remove duplicates
+              const filteredConversations = conversationsArray
+                .filter(c => (c.messageCount || 0) > 0) // Only show conversations with messages
+                .filter((conv, index, self) => 
+                  index === self.findIndex(c => c.id === conv.id) // Remove duplicates by ID
+                )
+              
+              setConversations(filteredConversations)
+              console.log('💬 ChatWidget - Converted object to array:', filteredConversations.length, '(filtered from', conversationsArray.length, ')')
             }
           } else {
             console.log('💬 ChatWidget - No conversations data found')
@@ -136,10 +189,19 @@ export default function ChatWidget() {
           console.log('💬 ChatWidget - Conversation details:', conversations.map(c => ({
             id: c.id,
             serviceProviderName: c.serviceProviderName,
-            customerName: c.customerName
+            customerName: c.customerName,
+            messageCount: c.messageCount
           })))
-          setConversations(conversations)
-          console.log('💬 ChatWidget - Set customer conversations:', conversations.length)
+          
+          // Filter out conversations with no messages and remove duplicates
+          const filteredConversations = conversations
+            .filter(c => c.messageCount > 0) // Only show conversations with messages
+            .filter((conv, index, self) => 
+              index === self.findIndex(c => c.id === conv.id) // Remove duplicates by ID
+            )
+          
+          setConversations(filteredConversations)
+          console.log('💬 ChatWidget - Set customer conversations:', filteredConversations.length, '(filtered from', conversations.length, ')')
         } else {
           console.log('💬 ChatWidget - No customer conversations found or invalid response')
           setConversations([])
@@ -156,6 +218,53 @@ export default function ChatWidget() {
       setConversations([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const startConversationWithProvider = async (providerId: string) => {
+    try {
+      console.log('💬 ChatWidget - Starting conversation with provider:', {
+        providerId,
+        activeProviderName,
+        activeProviderId
+      })
+      
+      // Create or get conversation with this provider
+      const response = await apiClient.startConversation({
+        providerId,
+        customerId: user?.id,
+        customerName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User',
+        customerEmail: user?.email || '',
+        customerPhone: user?.phoneNumber || ''
+      })
+
+      if (response.data?.success && response.data?.data?.conversationId) {
+        const conversationId = response.data.data.conversationId
+        console.log('💬 ChatWidget - Conversation created/found:', conversationId)
+        
+        // Create a temporary conversation object to open immediately
+        const providerDisplayName = activeProviderName || 'Специалист'
+        console.log('💬 ChatWidget - Using provider name:', providerDisplayName)
+        
+        const tempConversation: Conversation = {
+          id: conversationId,
+          customerName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Customer',
+          serviceProviderName: providerDisplayName,
+          lastMessage: '',
+          lastActivity: new Date().toISOString(),
+          unreadCount: 0
+        }
+        
+        console.log('💬 ChatWidget - Opening temp conversation:', tempConversation)
+        
+        // Open the conversation immediately
+        handleConversationClick(tempConversation)
+        
+        // Reload conversations in background to update the list
+        loadConversations()
+      }
+    } catch (error) {
+      console.error('💬 ChatWidget - Error starting conversation with provider:', error)
     }
   }
 
@@ -238,26 +347,17 @@ export default function ChatWidget() {
   }
 
   const initializeSocket = (conversationId: string) => {
+    if (!socket || !isConnected) {
+      console.log('💬 ChatWidget - Socket not available yet')
+      return
+    }
+
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.129:3000/api/v1'
-      const socketUrl = apiUrl.replace('/api/v1', '')
-      
-      console.log('💬 ChatWidget - Connecting to socket for conversation:', conversationId)
-      
-      const { io } = require('socket.io-client')
-      const socketInstance = io(socketUrl, {
-        transports: ['websocket', 'polling'],
-        timeout: 10000,
-        reconnection: true
-      })
+      console.log('💬 ChatWidget - Joining conversation room:', conversationId)
+      socket.emit('join-conversation', conversationId)
 
-      socketInstance.on('connect', () => {
-        console.log('✅ ChatWidget connected to WebSocket')
-        setSocket(socketInstance)
-        socketInstance.emit('join-conversation', conversationId)
-      })
-
-      socketInstance.on('new_message', (data: any) => {
+      // Listen for new messages in this conversation
+      const handleNewMessage = (data: any) => {
         console.log('💬 ChatWidget received new message:', data)
         if (data.conversationId === conversationId && data.messageId) {
           const newMessage = {
@@ -279,10 +379,14 @@ export default function ChatWidget() {
             return prev
           })
         }
-        
-        // Also refresh conversations list to update last message
-        loadConversations()
-      })
+      }
+
+      socket.on('new_message', handleNewMessage)
+
+      // Cleanup function
+      return () => {
+        socket.off('new_message', handleNewMessage)
+      }
 
     } catch (error) {
       console.error('💬 ChatWidget - Socket initialization error:', error)
@@ -359,10 +463,7 @@ export default function ChatWidget() {
     setActiveConversation(null)
     setMessages([])
     setNewMessage('')
-    if (socket) {
-      socket.disconnect()
-      setSocket(null)
-    }
+    // Socket is global, no need to disconnect
   }
 
   const formatMessageTime = (timestamp: string | number) => {
@@ -510,7 +611,7 @@ export default function ChatWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full shadow-lg transition-all duration-200 z-[9999] relative border-4 border-white"
+          className="fixed bottom-6 right-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-4 rounded-full shadow-lg transition-all duration-200 z-[9999] relative border-4 border-white"
           aria-label="Отвори чат"
           style={{ 
             position: 'fixed', 
@@ -540,7 +641,7 @@ export default function ChatWidget() {
           isMinimized ? 'w-80 h-12' : 'w-80 h-96'
         }`}>
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b bg-purple-600 text-white rounded-t-lg">
+          <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-lg">
             <div className="flex items-center space-x-2">
               {activeConversation && (
                 <button
@@ -551,9 +652,20 @@ export default function ChatWidget() {
                 </button>
               )}
               <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span className="font-medium">
-                {activeConversation ? activeConversation.customerName : 'Съобщения'}
-              </span>
+              <div className="flex flex-col">
+                <span className="font-medium">
+                  {activeConversation 
+                    ? (user?.role === 'customer' 
+                        ? activeConversation.serviceProviderName 
+                        : activeConversation.customerName)
+                    : 'Съобщения'}
+                </span>
+                {activeConversation && user?.role === 'customer' && activeConversation.serviceCategory && (
+                  <span className="text-xs text-indigo-200">
+                    {getServiceCategoryLabel(activeConversation.serviceCategory)}
+                  </span>
+                )}
+              </div>
               {!activeConversation && unreadTotal > 0 && (
                 <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                   {unreadTotal}
@@ -693,11 +805,18 @@ export default function ChatWidget() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {user?.role === 'customer' 
-                                    ? (conversation.serviceProviderName || 'Неизвестен специалист')
-                                    : (conversation.customerName || 'Неизвестен клиент')}
-                                </p>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                    {user?.role === 'customer' 
+                                      ? (conversation.serviceProviderName || 'Неизвестен специалист')
+                                      : (conversation.customerName || 'Неизвестен клиент')}
+                                  </p>
+                                  {user?.role === 'customer' && conversation.serviceCategory && (
+                                    <p className="text-xs text-gray-500 truncate">
+                                      {getServiceCategoryLabel(conversation.serviceCategory)}
+                                    </p>
+                                  )}
+                                </div>
                                 <div className="flex items-center space-x-2">
                                   {conversation.unreadCount > 0 && (
                                     <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">

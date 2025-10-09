@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { Header } from '@/components/Header'
-import ChatModal from '@/components/ChatModal'
 import UnifiedCaseModal from '@/components/UnifiedCaseModal'
 import ChatWidget from '@/components/ChatWidget'
 import { Footer } from '@/components/Footer'
@@ -32,10 +32,10 @@ export default function SearchPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user } = useAuth()
+  const { openWithProvider } = useChatWidget()
   const [providers, setProviders] = useState<ServiceProvider[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [chatModalOpen, setChatModalOpen] = useState(false)
   const [caseModalOpen, setCaseModalOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null)
   const [realTimeUpdates, setRealTimeUpdates] = useState(0) // Counter to track updates
@@ -259,8 +259,23 @@ export default function SearchPage() {
   }
 
   const handleStartChat = (provider: ServiceProvider) => {
-    setSelectedProvider(provider)
-    setChatModalOpen(true)
+    // Open ChatWidget with this provider
+    // Handle both camelCase and snake_case field names
+    const businessName = provider.business_name || (provider as any).businessName
+    const firstName = provider.first_name || (provider as any).firstName
+    const lastName = provider.last_name || (provider as any).lastName
+    
+    const providerName = businessName || `${firstName || ''} ${lastName || ''}`.trim() || 'Специалист'
+    
+    console.log('🔵 Search - Opening chat with provider:', {
+      id: provider.id,
+      name: providerName,
+      provider: provider,
+      businessName,
+      firstName,
+      lastName
+    })
+    openWithProvider(provider.id, providerName)
   }
 
   const handleCreateCase = (provider: ServiceProvider) => {
@@ -627,17 +642,6 @@ export default function SearchPage() {
       
       <Footer />
 
-      {/* Chat Modal */}
-      {selectedProvider && (
-        <ChatModal
-          provider={selectedProvider}
-          isOpen={chatModalOpen}
-          onClose={() => {
-            setChatModalOpen(false)
-            setSelectedProvider(null)
-          }}
-        />
-      )}
 
       {/* Case Creation Modal */}
       {selectedProvider && (

@@ -1365,7 +1365,8 @@ export class SQLiteDatabase {
           COUNT(mm.id) as message_count,
           COUNT(CASE WHEN mm.sender_type = 'customer' AND mm.is_read = 0 THEN 1 END) as unread_count,
           (SELECT message FROM marketplace_chat_messages WHERE conversation_id = mc.id ORDER BY sent_at DESC LIMIT 1) as last_message_content,
-          COALESCE(u.first_name || ' ' || u.last_name, p.business_name) as serviceProviderName
+          COALESCE(u.first_name || ' ' || u.last_name, p.business_name) as serviceProviderName,
+          p.service_category as serviceCategory
         FROM marketplace_conversations mc
         LEFT JOIN marketplace_chat_messages mm ON mc.id = mm.conversation_id
         LEFT JOIN service_provider_profiles p ON mc.provider_id = p.user_id

@@ -115,7 +115,7 @@ class ApiClient {
   // Messaging endpoints (connects to your existing messaging system)
   async getConversations() {
     // Get current user to determine correct endpoint
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const user = JSON.parse(localStorage.getItem('user_data') || localStorage.getItem('user') || '{}')
     if (user.role === 'customer') {
       return this.client.get(`/chat/user/${user.id}/conversations`)
     } else {
@@ -144,6 +144,7 @@ class ApiClient {
   // Marketplace Chat endpoints
   async startMarketplaceConversation(data: {
     providerId: string
+    customerId?: string
     customerName: string
     customerEmail: string
     customerPhone?: string
@@ -152,6 +153,7 @@ class ApiClient {
     
     const payload = {
       providerId: data.providerId,
+      customerId: data.customerId,
       customerName: data.customerName,
       customerEmail: data.customerEmail,
       customerPhone: data.customerPhone || ''
@@ -172,6 +174,18 @@ class ApiClient {
   // Alias for ChatModal compatibility
   async createOrGetConversation(data: {
     providerId: string
+    customerId?: string
+    customerName: string
+    customerEmail: string
+    customerPhone?: string
+  }) {
+    return this.startMarketplaceConversation(data)
+  }
+
+  // Alias for ChatWidget compatibility
+  async startConversation(data: {
+    providerId: string
+    customerId?: string
     customerName: string
     customerEmail: string
     customerPhone?: string

@@ -48,6 +48,16 @@ export const startConversation = async (req: Request, res: Response, next: NextF
 
     console.log('✅ Conversation created/found:', conversationId);
 
+    // Emit conversation list update to both provider and customer
+    const io = (req.app as any).get('io');
+    if (io) {
+      io.to(`user-${providerId}`).emit('conversations_updated');
+      if (customerId) {
+        io.to(`user-${customerId}`).emit('conversations_updated');
+      }
+      console.log('📡 Emitted conversations_updated event');
+    }
+
     res.status(201).json({
       success: true,
       data: { conversationId }
@@ -112,6 +122,12 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
           customerName: conversation.customer_name,
           customerEmail: conversation.customer_email
         });
+        
+        // Emit conversation list update to both provider and customer
+        io.to(`user-${conversation.provider_id}`).emit('conversations_updated');
+        if (conversation.customer_id) {
+          io.to(`user-${conversation.customer_id}`).emit('conversations_updated');
+        }
       }
       
       console.log('📡 WebSocket message emitted to conversation and user rooms');
@@ -348,6 +364,7 @@ export const getUserConversations = async (req: Request, res: Response, next: Ne
       customerName: conv.customer_name || 'Неизвестен клиент',
       customerEmail: conv.customer_email || '',
       serviceProviderName: conv.serviceProviderName || 'Неизвестен специалист',
+      serviceCategory: conv.serviceCategory || null,
       status: conv.status === 'active' ? 'ai_active' : conv.status,
       lastActivity: conv.last_message_at,
       conversationType: conv.conversation_type,

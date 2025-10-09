@@ -11,16 +11,6 @@ exports.id = "vendor-chunks/ws";
 exports.ids = ["vendor-chunks/ws"];
 exports.modules = {
 
-/***/ "(ssr)/./node_modules/ws/index.js":
-/*!**********************************!*\
-  !*** ./node_modules/ws/index.js ***!
-  \**********************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-eval("\n\nconst WebSocket = __webpack_require__(/*! ./lib/websocket */ \"(ssr)/./node_modules/ws/lib/websocket.js\");\n\nWebSocket.createWebSocketStream = __webpack_require__(/*! ./lib/stream */ \"(ssr)/./node_modules/ws/lib/stream.js\");\nWebSocket.Server = __webpack_require__(/*! ./lib/websocket-server */ \"(ssr)/./node_modules/ws/lib/websocket-server.js\");\nWebSocket.Receiver = __webpack_require__(/*! ./lib/receiver */ \"(ssr)/./node_modules/ws/lib/receiver.js\");\nWebSocket.Sender = __webpack_require__(/*! ./lib/sender */ \"(ssr)/./node_modules/ws/lib/sender.js\");\n\nWebSocket.WebSocket = WebSocket;\nWebSocket.WebSocketServer = WebSocket.Server;\n\nmodule.exports = WebSocket;\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHNzcikvLi9ub2RlX21vZHVsZXMvd3MvaW5kZXguanMiLCJtYXBwaW5ncyI6IkFBQWE7O0FBRWIsa0JBQWtCLG1CQUFPLENBQUMsaUVBQWlCOztBQUUzQyxrQ0FBa0MsbUJBQU8sQ0FBQywyREFBYztBQUN4RCxtQkFBbUIsbUJBQU8sQ0FBQywrRUFBd0I7QUFDbkQscUJBQXFCLG1CQUFPLENBQUMsK0RBQWdCO0FBQzdDLG1CQUFtQixtQkFBTyxDQUFDLDJEQUFjOztBQUV6QztBQUNBOztBQUVBIiwic291cmNlcyI6WyJ3ZWJwYWNrOi8vc2VydmljZXRleHRwcm8tbWFya2V0cGxhY2UvLi9ub2RlX21vZHVsZXMvd3MvaW5kZXguanM/YzRjMCJdLCJzb3VyY2VzQ29udGVudCI6WyIndXNlIHN0cmljdCc7XG5cbmNvbnN0IFdlYlNvY2tldCA9IHJlcXVpcmUoJy4vbGliL3dlYnNvY2tldCcpO1xuXG5XZWJTb2NrZXQuY3JlYXRlV2ViU29ja2V0U3RyZWFtID0gcmVxdWlyZSgnLi9saWIvc3RyZWFtJyk7XG5XZWJTb2NrZXQuU2VydmVyID0gcmVxdWlyZSgnLi9saWIvd2Vic29ja2V0LXNlcnZlcicpO1xuV2ViU29ja2V0LlJlY2VpdmVyID0gcmVxdWlyZSgnLi9saWIvcmVjZWl2ZXInKTtcbldlYlNvY2tldC5TZW5kZXIgPSByZXF1aXJlKCcuL2xpYi9zZW5kZXInKTtcblxuV2ViU29ja2V0LldlYlNvY2tldCA9IFdlYlNvY2tldDtcbldlYlNvY2tldC5XZWJTb2NrZXRTZXJ2ZXIgPSBXZWJTb2NrZXQuU2VydmVyO1xuXG5tb2R1bGUuZXhwb3J0cyA9IFdlYlNvY2tldDtcbiJdLCJuYW1lcyI6W10sInNvdXJjZVJvb3QiOiIifQ==\n//# sourceURL=webpack-internal:///(ssr)/./node_modules/ws/index.js\n");
-
-/***/ }),
-
 /***/ "(ssr)/./node_modules/ws/lib/buffer-util.js":
 /*!********************************************!*\
   !*** ./node_modules/ws/lib/buffer-util.js ***!

@@ -39,8 +39,8 @@ export default function ChatPage({ params }: ChatPageProps) {
     email: ''
   });
   const [providerInfo, setProviderInfo] = useState<any>({
-    businessName: 'Mama Mia',
-    firstName: 'Mama Mia',
+    businessName: '',
+    firstName: '',
     serviceCategory: 'electrician'
   });
 
@@ -332,12 +332,12 @@ export default function ChatPage({ params }: ChatPageProps) {
 
   const setFallbackProviderInfo = () => {
     setProviderInfo({
-      businessName: 'Mama Mia',
-      firstName: 'Mama Mia', 
+      businessName: 'Специалист',
+      firstName: 'Специалист', 
       lastName: '',
       serviceCategory: 'electrician'
     });
-    console.log('🔄 Using fallback provider info: Mama Mia');
+    console.log('🔄 Using fallback provider info: Специалист');
   };
 
   if (isValidating) {

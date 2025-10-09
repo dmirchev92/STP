@@ -120,10 +120,10 @@ class ServiceTextProServer {
       ]
     }));
 
-    // Rate limiting with GDPR logging
+    // Rate limiting with GDPR logging (disabled in development)
     const limiter = rateLimit({
       windowMs: config.security.rateLimit.windowMs,
-      max: config.security.rateLimit.maxRequests,
+      max: process.env.NODE_ENV === 'production' ? config.security.rateLimit.maxRequests : 10000, // Much higher limit in dev
       message: {
         error: 'Too many requests from this IP, please try again later.',
         code: 'RATE_LIMIT_EXCEEDED'
