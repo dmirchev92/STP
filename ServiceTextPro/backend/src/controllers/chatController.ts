@@ -16,10 +16,11 @@ export const startConversation = async (req: Request, res: Response, next: NextF
     console.log('📥 Received request body:', JSON.stringify(req.body, null, 2));
     console.log('📥 Body type:', typeof req.body, 'Is empty?', Object.keys(req.body || {}).length === 0);
     
-    const { providerId, customerName, customerEmail, customerPhone } = req.body;
+    const { providerId, customerId, customerName, customerEmail, customerPhone } = req.body;
 
     console.log('🔍 Extracted fields:', { 
       providerId: providerId || 'MISSING', 
+      customerId: customerId || 'null (unauthenticated)',
       customerName: customerName || 'MISSING', 
       customerEmail: customerEmail || 'MISSING',
       customerPhone: customerPhone || 'MISSING'
@@ -35,10 +36,11 @@ export const startConversation = async (req: Request, res: Response, next: NextF
       throw new ServiceTextProError('Provider ID, customer name, and email are required', 'BAD_REQUEST', 400);
     }
 
-    console.log('🗨️ Starting conversation:', { providerId, customerName, customerEmail });
+    console.log('🗨️ Starting conversation:', { providerId, customerId, customerName, customerEmail });
 
     const conversationId = await db.createOrGetConversation({
       providerId,
+      customerId,
       customerName,
       customerEmail,
       customerPhone
@@ -345,6 +347,7 @@ export const getUserConversations = async (req: Request, res: Response, next: Ne
       customerPhone: conv.customer_phone || '',
       customerName: conv.customer_name || 'Неизвестен клиент',
       customerEmail: conv.customer_email || '',
+      serviceProviderName: conv.serviceProviderName || 'Неизвестен специалист',
       status: conv.status === 'active' ? 'ai_active' : conv.status,
       lastActivity: conv.last_message_at,
       conversationType: conv.conversation_type,

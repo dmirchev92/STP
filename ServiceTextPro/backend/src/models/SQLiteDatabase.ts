@@ -1025,6 +1025,7 @@ export class SQLiteDatabase {
    */
   async createOrGetConversation(data: {
     providerId: string;
+    customerId?: string;
     customerName: string;
     customerEmail: string;
     customerPhone?: string;
@@ -1113,11 +1114,14 @@ export class SQLiteDatabase {
 
   // Helper method to continue conversation creation after provider profile is resolved
   private continueConversationCreation(
-    data: { providerId: string; customerName: string; customerEmail: string; customerPhone?: string },
+    data: { providerId: string; customerId?: string; customerName: string; customerEmail: string; customerPhone?: string },
     userId: string,
     resolve: (value: string) => void,
     reject: (reason?: any) => void
   ): void {
+    console.log('🔍 continueConversationCreation - Received data:', JSON.stringify(data, null, 2));
+    console.log('🔍 customerId value:', data.customerId, 'type:', typeof data.customerId);
+    
     // Now check if conversation already exists using original providerId
     this._db.get(
       `SELECT id FROM marketplace_conversations 
@@ -1134,13 +1138,13 @@ export class SQLiteDatabase {
           console.log('✅ Found existing conversation:', row.id);
           resolve(row.id);
         } else {
-          // Create new conversation with original providerId (not userId from service_providers)
+          // Create new conversation with original providerId and customerId
           const conversationId = this.generateId();
           this._db.run(
             `INSERT INTO marketplace_conversations (
-              id, provider_id, customer_name, customer_email, customer_phone
-            ) VALUES (?, ?, ?, ?, ?)`,
-            [conversationId, data.providerId, data.customerName, data.customerEmail, data.customerPhone],
+              id, provider_id, customer_id, customer_name, customer_email, customer_phone
+            ) VALUES (?, ?, ?, ?, ?, ?)`,
+            [conversationId, data.providerId, data.customerId || null, data.customerName, data.customerEmail, data.customerPhone],
             (err) => {
               if (err) {
                 reject(err);
@@ -1148,6 +1152,7 @@ export class SQLiteDatabase {
                 console.log('✅ Created new marketplace conversation:');
                 console.log('  - Conversation ID:', conversationId);
                 console.log('  - Provider User ID:', data.providerId);
+                console.log('  - Customer ID:', data.customerId || 'null (unauthenticated)');
                 console.log('  - Customer Name:', data.customerName);
                 console.log('  - Customer Email:', data.customerEmail);
                 
@@ -1344,6 +1349,7 @@ export class SQLiteDatabase {
         [userId],
         () => {
           // Get marketplace conversations (unified system)
+          // Query for both provider and customer conversations
           const query = `
         SELECT 
           'marketplace' as conversation_type,
@@ -1351,21 +1357,26 @@ export class SQLiteDatabase {
           mc.customer_phone,
           mc.customer_name,
           mc.customer_email,
+          mc.provider_id,
+          mc.customer_id,
           mc.status,
           mc.created_at,
           mc.last_message_at,
           COUNT(mm.id) as message_count,
           COUNT(CASE WHEN mm.sender_type = 'customer' AND mm.is_read = 0 THEN 1 END) as unread_count,
-          (SELECT message FROM marketplace_chat_messages WHERE conversation_id = mc.id ORDER BY sent_at DESC LIMIT 1) as last_message_content
+          (SELECT message FROM marketplace_chat_messages WHERE conversation_id = mc.id ORDER BY sent_at DESC LIMIT 1) as last_message_content,
+          COALESCE(u.first_name || ' ' || u.last_name, p.business_name) as serviceProviderName
         FROM marketplace_conversations mc
         LEFT JOIN marketplace_chat_messages mm ON mc.id = mm.conversation_id
-        WHERE mc.provider_id = ?
+        LEFT JOIN service_provider_profiles p ON mc.provider_id = p.user_id
+        LEFT JOIN users u ON mc.provider_id = u.id
+        WHERE mc.provider_id = ? OR mc.customer_id = ?
         GROUP BY mc.id
         
         ORDER BY last_message_at DESC
       `;
 
-          this._db.all(query, [userId], (err, rows) => {
+          this._db.all(query, [userId, userId], (err, rows) => {
             if (err) {
               console.error('❌ Error getting user conversations:', err);
               reject(err);
@@ -1373,7 +1384,8 @@ export class SQLiteDatabase {
               console.log('📱 Found conversations for user', userId + ':', rows?.length || 0);
               rows?.forEach((row: any) => {
                 console.log('  -', row.conversation_type, 'conversation:', row.id,
-                           'customer:', row.customer_name || row.customer_phone,
+                           'provider:', row.provider_id, 'customer:', row.customer_id,
+                           'customer_name:', row.customer_name || row.customer_phone,
                            'messages:', row.message_count);
               });
               resolve(rows || []);

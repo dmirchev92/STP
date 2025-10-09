@@ -133,6 +133,11 @@ export default function ChatWidget() {
         console.log('💬 ChatWidget - Customer conversations response:', response.data)
         const conversations = response.data?.data?.conversations
         if (response.data?.success && Array.isArray(conversations)) {
+          console.log('💬 ChatWidget - Conversation details:', conversations.map(c => ({
+            id: c.id,
+            serviceProviderName: c.serviceProviderName,
+            customerName: c.customerName
+          })))
           setConversations(conversations)
           console.log('💬 ChatWidget - Set customer conversations:', conversations.length)
         } else {
