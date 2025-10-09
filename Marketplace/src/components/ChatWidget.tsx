@@ -131,9 +131,10 @@ export default function ChatWidget() {
         console.log('💬 ChatWidget - Loading customer conversations')
         const response = await apiClient.getConversations()
         console.log('💬 ChatWidget - Customer conversations response:', response.data)
-        if (response.data?.success && Array.isArray(response.data.data)) {
-          setConversations(response.data.data)
-          console.log('💬 ChatWidget - Set customer conversations:', response.data.data.length)
+        const conversations = response.data?.data?.conversations
+        if (response.data?.success && Array.isArray(conversations)) {
+          setConversations(conversations)
+          console.log('💬 ChatWidget - Set customer conversations:', conversations.length)
         } else {
           console.log('💬 ChatWidget - No customer conversations found or invalid response')
           setConversations([])
@@ -678,22 +679,24 @@ export default function ChatWidget() {
                           <div
                             key={conversation.id}
                             onClick={() => handleConversationClick(conversation)}
-                            className="flex items-center space-x-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100"
+                            className="p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-200 flex items-start space-x-3"
                           >
                             <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
                               <span className="text-purple-600 font-medium text-sm">
-                                {conversation.customerName?.charAt(0) || 'C'}
+                                {(user?.role === 'customer' ? conversation.serviceProviderName : conversation.customerName)?.charAt(0) || 'C'}
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
                                 <p className="text-sm font-medium text-gray-900 truncate">
-                                  {conversation.customerName || 'Неизвестен клиент'}
+                                  {user?.role === 'customer' 
+                                    ? (conversation.serviceProviderName || 'Неизвестен специалист')
+                                    : (conversation.customerName || 'Неизвестен клиент')}
                                 </p>
                                 <div className="flex items-center space-x-2">
                                   {conversation.unreadCount > 0 && (
                                     <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
-                                      {conversation.unreadCount}
+                                      {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
                                     </span>
                                   )}
                                   <span className="text-xs text-gray-500">

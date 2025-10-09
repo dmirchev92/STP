@@ -86,31 +86,42 @@ export default function ChatModal({ provider, isOpen, onClose }: ChatModalProps)
 
   // Initialize user data only once when modal opens
   useEffect(() => {
-    if (isOpen && isAuthenticated && user && !isStarted) {
-      console.log('🗨️ ChatModal opened for provider:', provider.id)
-      
-      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim()
-      const finalName = fullName || 'User'
-      
-      setCustomerName(finalName)
-      setCustomerEmail(user.email || '')
-      setCustomerPhone(user.phoneNumber || '')
-      
-      // Check for existing conversation
-      const savedConversationId = localStorage.getItem(conversationKey)
-      if (savedConversationId) {
-        setConversationId(savedConversationId)
-        setIsStarted(true)
-        loadMessages(savedConversationId)
-      } else {
-        // Auto-start conversation for authenticated users
-        startConversation({ 
-          name: finalName, 
-          email: user.email || '', 
-          phone: user.phoneNumber || '' 
-        })
+    const initializeChat = async () => {
+      if (isOpen && isAuthenticated && user && !isStarted) {
+        console.log('🗨️ ChatModal opened for provider:', provider.id)
+        
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim()
+        const finalName = fullName || 'User'
+        
+        setCustomerName(finalName)
+        setCustomerEmail(user.email || '')
+        setCustomerPhone(user.phoneNumber || '')
+        
+        // Check for existing conversation
+        const savedConversationId = localStorage.getItem(conversationKey)
+        if (savedConversationId) {
+          console.log('🔍 Found saved conversation ID:', savedConversationId)
+          // Always create a new conversation for authenticated users to ensure customer_id is set
+          // The backend will return existing conversation if it already exists
+          console.log('🔄 Creating/getting conversation to ensure customer_id is set')
+          localStorage.removeItem(conversationKey)
+          await startConversation({ 
+            name: finalName, 
+            email: user.email || '', 
+            phone: user.phoneNumber || '' 
+          })
+        } else {
+          // Auto-start conversation for authenticated users
+          await startConversation({ 
+            name: finalName, 
+            email: user.email || '', 
+            phone: user.phoneNumber || '' 
+          })
+        }
       }
     }
+    
+    initializeChat()
   }, [isOpen, isAuthenticated, user, provider.id])
 
   // Join conversation room when modal opens
@@ -170,6 +181,7 @@ export default function ChatModal({ provider, isOpen, onClose }: ChatModalProps)
     try {
       const data = {
         providerId: provider.id,
+        customerId: user?.id || undefined, // Add authenticated user ID
         customerName: overrideData?.name || customerName,
         customerEmail: overrideData?.email || customerEmail,
         customerPhone: overrideData?.phone || customerPhone
